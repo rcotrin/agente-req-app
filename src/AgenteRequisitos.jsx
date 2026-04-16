@@ -1664,6 +1664,7 @@ export default function AgenteRequisitos() {
   const dropRef    = useRef(null);
   const migDropRef = useRef(null);
   const [faqOpen, setFaqOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
 
   const setErr = (msg, err) => {
     const full = err ? `${msg}\n\n${err?.stack || err}` : msg;
@@ -2534,6 +2535,12 @@ export default function AgenteRequisitos() {
           </div>
         )}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+          <button onClick={() => setManualOpen(true)} title="Manual do usuário — passo a passo do app"
+            style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, color: C.textDim, fontSize: 12, padding: "5px 13px", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", transition: "all .15s" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.green; e.currentTarget.style.color = C.green; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}>
+            ☰ Manual
+          </button>
           <button onClick={() => setFaqOpen(true)} title="Por que trabalhamos assim? Rastreabilidade e auditorias."
             style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, color: C.textDim, fontSize: 12, padding: "5px 13px", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", transition: "all .15s" }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
@@ -3430,6 +3437,223 @@ export default function AgenteRequisitos() {
           </div>
         )}
       </div>
+
+      {/* ── Manual Modal ─────────────────────────────────────────── */}
+      {manualOpen && (
+        <div onClick={e => e.target === e.currentTarget && setManualOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(10,14,26,0.55)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", overflowY: "auto" }}>
+          <div style={{ background: "#ffffff", borderRadius: 12, border: `1px solid ${C.border}`, width: "100%", maxWidth: 800, fontFamily: "'IBM Plex Mono','Courier New',monospace", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>
+
+            {/* Header */}
+            <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 12, background: "#f0fdf4", borderRadius: "12px 12px 0 0" }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.green }} />
+              <span style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 16, color: C.textBright, flex: 1 }}>☰ Manual do Usuário</span>
+              <span style={{ fontSize: 11, color: C.muted, marginRight: 8 }}>Guia completo · passo a passo</span>
+              <button onClick={() => setManualOpen(false)}
+                style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, color: C.textDim, fontSize: 13, padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}>
+                ✕ fechar
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "24px 28px", maxHeight: "75vh", overflowY: "auto" }}>
+
+              {/* Visão geral */}
+              <div style={{ marginBottom: 24, padding: "14px 18px", background: "#f0fdf4", border: `1px solid ${C.green}30`, borderRadius: 10 }}>
+                <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 13, color: C.green, marginBottom: 8 }}>O que é este app?</div>
+                <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
+                  O <strong>Agente de Requisitos</strong> transforma documentos de texto (atas, levantamentos, especificações) em artefatos estruturados de engenharia de software — Épicos, Features/UCs, Requisitos/HUs e Casos de Teste — prontos para serem publicados no <strong>Azure DevOps</strong> e na <strong>Wiki</strong>.
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+                  {["PDF · DOCX · TXT · MD", "Claude AI (Sonnet + Haiku)", "Azure DevOps REST API", "Wiki Git"].map(t => (
+                    <span key={t} style={{ fontSize: 10, padding: "3px 10px", borderRadius: 12, background: C.green + "15", color: C.green, fontWeight: 700 }}>{t}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Pré-requisitos */}
+              <FAQ_Q n="PRÉ-REQ" q="Pré-requisitos antes de começar" accent={C.accent}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {[
+                    { label: "Chave Anthropic (sk-ant-...)", desc: "Obtenha em console.anthropic.com. Cole no campo API Key no canto superior direito. O ícone ✓ verde confirma que foi aceita." },
+                    { label: "Documento-fonte", desc: "Qualquer arquivo PDF, DOCX, TXT ou MD com a descrição da necessidade de negócio — ata de reunião, levantamento de requisitos, especificação funcional." },
+                    { label: "Dados do Azure DevOps (opcional)", desc: "Organização, Projeto, PAT (Personal Access Token) — necessários apenas nas Fases 7 (exportar work items) e 8 (publicar Wiki)." },
+                  ].map(({ label, desc }) => (
+                    <div key={label} style={{ display: "flex", gap: 10 }}>
+                      <span style={{ color: C.accent, flexShrink: 0, fontWeight: 700 }}>▸</span>
+                      <div><strong style={{ color: "#0f172a" }}>{label}</strong><br /><span style={{ color: "#475569" }}>{desc}</span></div>
+                    </div>
+                  ))}
+                </div>
+              </FAQ_Q>
+
+              {/* Fase 0 */}
+              <FAQ_Q n="FASE 0" q="Upload e tipo de documento" accent="#0284c7">
+                <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
+                  <p style={{ marginTop: 0 }}>Arraste ou clique na área de upload para carregar seu arquivo. O app lê PDF, DOCX, TXT e MD.</p>
+                  <p>Escolha o <strong>Tipo de Documento</strong> que define como os artefatos serão nomeados e estruturados:</p>
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", margin: "8px 0" }}>
+                    <div style={{ flex: 1, minWidth: 200, padding: "10px 14px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8 }}>
+                      <div style={{ fontWeight: 700, color: "#0369a1", marginBottom: 4 }}>COR (Correção)</div>
+                      <div style={{ color: "#475569", fontSize: 11 }}>Usa a nomenclatura de <em>Casos de Uso</em> (UC, Fluxo Principal, Fluxo Alternativo). Ideal para sistemas com interações claras entre ator e sistema.</div>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 200, padding: "10px 14px", background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: 8 }}>
+                      <div style={{ fontWeight: 700, color: "#7c3aed", marginBottom: 4 }}>Produto (Feature-Based)</div>
+                      <div style={{ color: "#475569", fontSize: 11 }}>Usa a nomenclatura de <em>Histórias de Usuário</em> (HU, Critérios de Aceite). Ideal para produtos ágeis orientados a valor.</div>
+                    </div>
+                  </div>
+                  <p>Clique em <strong>"Extrair Texto"</strong> para iniciar o processamento.</p>
+                </div>
+              </FAQ_Q>
+
+              {/* Fase 1 */}
+              <FAQ_Q n="FASE 1" q="Extração e resumo do documento" accent="#0284c7">
+                <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
+                  <p style={{ marginTop: 0 }}>O app divide o documento em blocos de texto, envia cada bloco ao Claude (Haiku) e gera um <strong>resumo consolidado</strong> com as informações relevantes para geração de requisitos.</p>
+                  <p>Você pode <strong>editar o texto extraído</strong> antes de avançar — útil para corrigir problemas de OCR ou remover seções irrelevantes (cabeçalhos, rodapés, etc.).</p>
+                  <p>Quando satisfeito, clique em <strong>"Gerar Épicos →"</strong>.</p>
+                </div>
+              </FAQ_Q>
+
+              {/* Fase 2 */}
+              <FAQ_Q n="FASE 2" q="Geração de Épicos" accent="#7c3aed">
+                <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
+                  <p style={{ marginTop: 0 }}>O Claude analisa o resumo e identifica as <strong>grandes áreas de negócio</strong>, cada uma gerando um Épico (ex: <em>Conciliação DDA</em>, <em>Gestão de Usuários</em>).</p>
+                  <p>Para cada Épico gerado você pode:</p>
+                  <ul style={{ paddingLeft: 18, margin: "6px 0" }}>
+                    <li>Editar título e descrição diretamente</li>
+                    <li>Adicionar uma correção no painel amarelo e clicar <strong>"Regerar com esta correção"</strong></li>
+                    <li>Remover épicos irrelevantes com o botão ✕</li>
+                    <li>Adicionar épicos manualmente com <strong>"+ Novo Épico"</strong></li>
+                  </ul>
+                  <p>Quando a lista estiver correta, clique em <strong>"Gerar Features/UCs →"</strong>.</p>
+                </div>
+              </FAQ_Q>
+
+              {/* Fase 3 */}
+              <FAQ_Q n="FASE 3" q="Geração de Features / Casos de Uso" accent="#0891b2">
+                <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
+                  <p style={{ marginTop: 0 }}>Para cada Épico, o app gera Features (modo Produto) ou Casos de Uso com fluxo principal e alternativo (modo COR).</p>
+                  <p>Cada UC inclui: <strong>Ator Principal · Pré-condição · Fluxo Principal (passos numerados) · Fluxo Alternativo · Pós-condição</strong>.</p>
+                  <p>Use o <strong>painel de correção amarelo</strong> (por UC) para ajustes pontuais sem regeração completa.</p>
+                  <p>Ao final, clique em <strong>"Gerar Requisitos/HUs →"</strong>.</p>
+                </div>
+              </FAQ_Q>
+
+              {/* Fase 4 */}
+              <FAQ_Q n="FASE 4" q="Geração de Requisitos / Histórias de Usuário" accent="#0891b2">
+                <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
+                  <p style={{ marginTop: 0 }}>Cada Feature/UC dá origem a múltiplas Histórias de Usuário com:</p>
+                  <ul style={{ paddingLeft: 18, margin: "6px 0" }}>
+                    <li><strong>Regras de Negócio (RN)</strong> — restrições e políticas</li>
+                    <li><strong>Requisitos Funcionais (RF)</strong> — o que o sistema deve fazer</li>
+                    <li><strong>Requisitos Não-Funcionais (RNF)</strong> — desempenho, segurança, usabilidade</li>
+                    <li><strong>Critérios de Aceite</strong> — condições verificáveis de conclusão</li>
+                  </ul>
+                  <div style={{ padding: "8px 12px", background: "#fefce8", border: "1px solid #fde047", borderRadius: 6, marginTop: 8 }}>
+                    <strong style={{ color: "#854d0e" }}>Painel de Auditoria de Referências:</strong>
+                    <span style={{ color: "#713f12" }}> verifica automaticamente se todos os IDs de RN/RF/RNF citados nos fluxos estão definidos nas HUs e vice-versa. Lacunas aparecem em vermelho, órfãos em âmbar.</span>
+                  </div>
+                </div>
+              </FAQ_Q>
+
+              {/* Fase 5 */}
+              <FAQ_Q n="FASE 5" q="Geração de Casos de Teste" accent="#059669">
+                <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
+                  <p style={{ marginTop: 0 }}>Para cada HU, o app gera Casos de Teste cobrindo os cenários do fluxo principal e alternativo.</p>
+                  <p>Cada CT inclui: <strong>Pré-condição · Passos de Execução · Resultado Esperado · Classificação (Funcional / Não-Funcional / Regressão)</strong>.</p>
+                  <p>Clique em <strong>"Revisar Tudo →"</strong> para consolidar todos os artefatos na próxima fase.</p>
+                </div>
+              </FAQ_Q>
+
+              {/* Fase 6 */}
+              <FAQ_Q n="FASE 6" q="Revisão consolidada" accent="#d97706">
+                <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
+                  <p style={{ marginTop: 0 }}>Visão completa de todos os artefatos gerados em ordem hierárquica: Épico → UC → HU → CT.</p>
+                  <p>Você pode fazer ajustes finais em qualquer artefato antes de exportar. Use os painéis de <strong>correção amarelos</strong> para indicar alterações e regerar apenas o item afetado.</p>
+                  <p>Quando aprovado, avance para <strong>"Configurar DevOps →"</strong>.</p>
+                </div>
+              </FAQ_Q>
+
+              {/* Fase 7 */}
+              <FAQ_Q n="FASE 7" q="Exportar para Azure DevOps" accent="#0369a1">
+                <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
+                  <p style={{ marginTop: 0 }}>Preencha os campos de configuração do Azure DevOps:</p>
+                  <ul style={{ paddingLeft: 18, margin: "6px 0" }}>
+                    <li><strong>Organização</strong> — nome da sua org no Azure DevOps (ex: <em>minhaempresa</em>)</li>
+                    <li><strong>Projeto</strong> — nome do projeto destino</li>
+                    <li><strong>PAT</strong> — Personal Access Token com permissão <em>Work Items (Read &amp; Write)</em></li>
+                    <li><strong>Área / Sprint</strong> — opcional, para classificar os work items</li>
+                  </ul>
+                  <p>Clique em <strong>"Exportar Work Items"</strong>. O app cria a hierarquia <strong>Épico → Feature → Requirement → Task</strong> no Azure DevOps com rastreabilidade automática entre os níveis.</p>
+                  <div style={{ padding: "8px 12px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 6, marginTop: 8 }}>
+                    <strong style={{ color: "#0369a1" }}>Dica:</strong>
+                    <span style={{ color: "#0c4a6e" }}> o PAT pode ser gerado em <em>Azure DevOps → User Settings → Personal Access Tokens</em>. Defina validade de 30–90 dias e escopo mínimo.</span>
+                  </div>
+                </div>
+              </FAQ_Q>
+
+              {/* Fase 8 */}
+              <FAQ_Q n="FASE 8" q="Publicar na Wiki do Azure DevOps" accent="#0369a1">
+                <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
+                  <p style={{ marginTop: 0 }}>Após exportar os work items, clique em <strong>"Publicar Wiki"</strong> para gerar e enviar a documentação estruturada ao repositório Git da Wiki do seu projeto.</p>
+                  <p>A Wiki é gerada com páginas separadas para:</p>
+                  <ul style={{ paddingLeft: 18, margin: "6px 0" }}>
+                    <li>Visão geral do projeto (índice de épicos)</li>
+                    <li>Cada UC / Feature (com fluxos e RNs)</li>
+                    <li>Cada HU (com RFs, RNFs e critérios de aceite)</li>
+                    <li>Casos de Teste por UC</li>
+                  </ul>
+                  <p>Todos os arquivos são enviados via <strong>Git push para o repositório <code>ProjectName.wiki</code></strong> no Azure DevOps.</p>
+                </div>
+              </FAQ_Q>
+
+              {/* Migração */}
+              <FAQ_Q n="MIGRAÇÃO" q="Modo Migrar Documento existente" accent={C.purple}>
+                <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
+                  <p style={{ marginTop: 0 }}>Use o botão <strong>"Migrar Documento"</strong> (fase de revisão) quando você já tem um documento de especificação existente e quer publicá-lo na Wiki sem regeração.</p>
+                  <p>O app converte o conteúdo do documento para o formato Markdown da Wiki, preservando a estrutura original. Ideal para migrar especificações legadas para o Azure DevOps.</p>
+                  <div style={{ padding: "8px 12px", background: "#faf5ff", border: `1px solid ${C.purple}30`, borderRadius: 6, marginTop: 8 }}>
+                    <strong style={{ color: C.purple }}>Diferença chave:</strong>
+                    <span style={{ color: "#4c1d95" }}> o fluxo principal gera e reestrutura os artefatos. O modo migração apenas converte e publica sem alterar o conteúdo.</span>
+                  </div>
+                </div>
+              </FAQ_Q>
+
+              {/* Persistência */}
+              <FAQ_Q n="SESSÃO" q="Persistência e retomada de sessão" accent={C.green}>
+                <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
+                  <p style={{ marginTop: 0 }}>Todo o estado do app é salvo automaticamente no <strong>localStorage</strong> do navegador. Se você fechar a aba ou recarregar a página, os artefatos gerados serão restaurados exatamente onde você parou.</p>
+                  <p>Use <strong>"✕ limpar"</strong> no topo para iniciar uma nova análise (isso apaga o estado salvo permanentemente).</p>
+                  <div style={{ padding: "8px 12px", background: "#f0fdf4", border: `1px solid ${C.green}30`, borderRadius: 6, marginTop: 8 }}>
+                    <strong style={{ color: C.green }}>Atenção:</strong>
+                    <span style={{ color: "#14532d" }}> a chave API NÃO é salva por segurança — você precisará reinseri-la a cada sessão.</span>
+                  </div>
+                </div>
+              </FAQ_Q>
+
+              {/* Limitações */}
+              <FAQ_Q n="LIMITES" q="Limitações conhecidas e boas práticas" accent={C.red}>
+                <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
+                  <ul style={{ paddingLeft: 18, margin: 0 }}>
+                    <li style={{ marginBottom: 6 }}><strong>Documentos grandes (&gt; 50 páginas):</strong> O processamento é feito em chunks. Documentos muito longos podem gerar mais de uma chamada à API, aumentando custo e tempo.</li>
+                    <li style={{ marginBottom: 6 }}><strong>PDF com imagens:</strong> O app extrai apenas texto. Diagramas e tabelas em imagem são ignorados.</li>
+                    <li style={{ marginBottom: 6 }}><strong>Rastreabilidade de origem:</strong> O elo entre cada artefato gerado e a seção exata do documento fonte ainda não é registrado automaticamente (melhoria planejada).</li>
+                    <li style={{ marginBottom: 6 }}><strong>Custo da API:</strong> O uso do Claude Sonnet consome créditos Anthropic. Para documentos grandes, use a fase de pré-resumo para reduzir tokens enviados.</li>
+                    <li><strong>Azure DevOps PAT:</strong> O token trafega no cliente. Use tokens de validade curta e revogue-os após o uso.</li>
+                  </ul>
+                </div>
+              </FAQ_Q>
+
+              {/* Rodapé */}
+              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 14, marginTop: 8, fontSize: 11, color: C.muted, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                <span>Agente de Requisitos · Stack: React 19 + Vite + Claude API + Azure DevOps REST</span>
+                <span>rafael.cotrin@ytecnologia.com</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── FAQ Modal ────────────────────────────────────────────── */}
       {faqOpen && (
