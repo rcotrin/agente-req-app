@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/anthropic/:path*", "destination": "https://api.anthropic.com/:path*" },
+    { "source": "/devops/:path*",    "destination": "https://dev.azure.com/:path*"      }
+  ]
+}
