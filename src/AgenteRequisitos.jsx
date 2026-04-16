@@ -3465,7 +3465,7 @@ export default function AgenteRequisitos() {
                   O <strong>Agente de Requisitos</strong> transforma documentos de texto (atas, levantamentos, especificações) em artefatos estruturados de engenharia de software — Épicos, Features/UCs, Requisitos/HUs e Casos de Teste — prontos para serem publicados no <strong>Azure DevOps</strong> e na <strong>Wiki</strong>.
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-                  {["PDF · DOCX · TXT · MD", "Claude AI (Sonnet + Haiku)", "Azure DevOps REST API", "Wiki Git"].map(t => (
+                  {["PDF · DOCX · TXT · MD", "Modelo de Linguagem (LLM)", "Azure DevOps REST API", "Wiki Git"].map(t => (
                     <span key={t} style={{ fontSize: 10, padding: "3px 10px", borderRadius: 12, background: C.green + "15", color: C.green, fontWeight: 700 }}>{t}</span>
                   ))}
                 </div>
@@ -3509,7 +3509,7 @@ export default function AgenteRequisitos() {
               {/* Fase 1 */}
               <FAQ_Q n="FASE 1" q="Extração e resumo do documento" accent="#0284c7">
                 <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
-                  <p style={{ marginTop: 0 }}>O app divide o documento em blocos de texto, envia cada bloco ao Claude (Haiku) e gera um <strong>resumo consolidado</strong> com as informações relevantes para geração de requisitos.</p>
+                  <p style={{ marginTop: 0 }}>O app divide o documento em blocos de texto, envia cada bloco ao modelo de linguagem (LLM) e gera um <strong>resumo consolidado</strong> com as informações relevantes para geração de requisitos.</p>
                   <p>Você pode <strong>editar o texto extraído</strong> antes de avançar — útil para corrigir problemas de OCR ou remover seções irrelevantes (cabeçalhos, rodapés, etc.).</p>
                   <p>Quando satisfeito, clique em <strong>"Gerar Épicos →"</strong>.</p>
                 </div>
@@ -3518,7 +3518,7 @@ export default function AgenteRequisitos() {
               {/* Fase 2 */}
               <FAQ_Q n="FASE 2" q="Geração de Épicos" accent="#7c3aed">
                 <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
-                  <p style={{ marginTop: 0 }}>O Claude analisa o resumo e identifica as <strong>grandes áreas de negócio</strong>, cada uma gerando um Épico (ex: <em>Conciliação DDA</em>, <em>Gestão de Usuários</em>).</p>
+                  <p style={{ marginTop: 0 }}>O modelo analisa o resumo e identifica as <strong>grandes áreas de negócio</strong>, cada uma gerando um Épico (ex: <em>Conciliação DDA</em>, <em>Gestão de Usuários</em>).</p>
                   <p>Para cada Épico gerado você pode:</p>
                   <ul style={{ paddingLeft: 18, margin: "6px 0" }}>
                     <li>Editar título e descrição diretamente</li>
@@ -3533,9 +3533,19 @@ export default function AgenteRequisitos() {
               {/* Fase 3 */}
               <FAQ_Q n="FASE 3" q="Geração de Features / Casos de Uso" accent="#0891b2">
                 <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
-                  <p style={{ marginTop: 0 }}>Para cada Épico, o app gera Features (modo Produto) ou Casos de Uso com fluxo principal e alternativo (modo COR).</p>
-                  <p>Cada UC inclui: <strong>Ator Principal · Pré-condição · Fluxo Principal (passos numerados) · Fluxo Alternativo · Pós-condição</strong>.</p>
-                  <p>Use o <strong>painel de correção amarelo</strong> (por UC) para ajustes pontuais sem regeração completa.</p>
+                  <div style={{ padding: "8px 12px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 6, marginBottom: 10 }}>
+                    <strong style={{ color: "#0369a1" }}>Feature e Caso de Uso (UC) são a mesma coisa.</strong>
+                    <span style={{ color: "#0c4a6e" }}> O termo varia conforme o modo selecionado, mas representa o mesmo conceito: uma funcionalidade do sistema descrita pela interação entre um <em>ator</em> e o <em>sistema</em>. A nomenclatura "Caso de Uso" facilita a associação direta com as funcionalidades identificadas no documento-fonte.</span>
+                  </div>
+                  <p style={{ marginTop: 0 }}>Para cada Épico, o modelo identifica as funcionalidades e as estrutura com:</p>
+                  <ul style={{ paddingLeft: 18, margin: "6px 0" }}>
+                    <li><strong>Ator Principal</strong> — quem interage com o sistema (usuário, sistema externo, etc.)</li>
+                    <li><strong>Pré-condição</strong> — estado necessário antes da execução</li>
+                    <li><strong>Fluxo Principal</strong> — passos numerados da interação esperada entre ator e sistema</li>
+                    <li><strong>Fluxo Alternativo</strong> — desvios, erros e exceções ao fluxo principal</li>
+                    <li><strong>Pós-condição</strong> — estado do sistema após a execução bem-sucedida</li>
+                  </ul>
+                  <p>Use o <strong>painel de correção amarelo</strong> (por UC/Feature) para ajustes pontuais sem regeração completa.</p>
                   <p>Ao final, clique em <strong>"Gerar Requisitos/HUs →"</strong>.</p>
                 </div>
               </FAQ_Q>
@@ -3576,19 +3586,40 @@ export default function AgenteRequisitos() {
               </FAQ_Q>
 
               {/* Fase 7 */}
-              <FAQ_Q n="FASE 7" q="Exportar para Azure DevOps" accent="#0369a1">
+              <FAQ_Q n="FASE 7" q="Criar Itens de Trabalho no Azure DevOps (Work Items)" accent="#0369a1">
                 <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
-                  <p style={{ marginTop: 0 }}>Preencha os campos de configuração do Azure DevOps:</p>
+                  <div style={{ padding: "10px 14px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, marginBottom: 12 }}>
+                    <div style={{ fontWeight: 700, color: "#1e40af", marginBottom: 6 }}>O que são itens de trabalho?</div>
+                    <div style={{ color: "#1e3a5f" }}>Itens de trabalho (<em>Work Items</em>) são registros rastreáveis dentro do Azure DevOps Boards — o equivalente digital de cartões em um quadro Kanban/Scrum. Cada item tem ID único, responsável, sprint, status e histórico de alterações. São <strong>diferentes da Wiki</strong>: enquanto a Wiki é documentação estática, os work items são entidades ativas que movem o fluxo de desenvolvimento.</div>
+                  </div>
+                  <p style={{ marginTop: 0 }}>Preencha os campos de configuração:</p>
                   <ul style={{ paddingLeft: 18, margin: "6px 0" }}>
                     <li><strong>Organização</strong> — nome da sua org no Azure DevOps (ex: <em>minhaempresa</em>)</li>
                     <li><strong>Projeto</strong> — nome do projeto destino</li>
                     <li><strong>PAT</strong> — Personal Access Token com permissão <em>Work Items (Read &amp; Write)</em></li>
-                    <li><strong>Área / Sprint</strong> — opcional, para classificar os work items</li>
+                    <li><strong>Área / Sprint</strong> — opcional, para classificar os itens no board</li>
                   </ul>
-                  <p>Clique em <strong>"Exportar Work Items"</strong>. O app cria a hierarquia <strong>Épico → Feature → Requirement → Task</strong> no Azure DevOps com rastreabilidade automática entre os níveis.</p>
+                  <p>Clique em <strong>"Exportar Work Items"</strong>. O app cria a seguinte hierarquia no Azure DevOps Boards:</p>
+                  <div style={{ margin: "10px 0", padding: "12px 16px", background: "#f8faff", border: "1px solid #dde8f5", borderRadius: 8, fontFamily: "'IBM Plex Mono',monospace" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      {[
+                        { tipo: "Epic", cor: "#7c3aed", desc: "Área de negócio completa (ex: Conciliação DDA)" },
+                        { tipo: "Feature", cor: "#0891b2", desc: "Funcionalidade / Caso de Uso do Épico pai" },
+                        { tipo: "Requirement", cor: "#059669", desc: "História de Usuário (HU) vinculada à Feature" },
+                        { tipo: "Task", cor: "#d97706", desc: "Caso de Teste associado ao Requirement pai" },
+                      ].map(({ tipo, cor, desc }, i) => (
+                        <div key={tipo} style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: i * 16 }}>
+                          <span style={{ fontSize: 9, color: "#94a3b8" }}>{"└─"}</span>
+                          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: cor + "18", color: cor, fontWeight: 700, flexShrink: 0 }}>{tipo}</span>
+                          <span style={{ fontSize: 11, color: "#475569" }}>{desc}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <p>Cada item é criado via REST API com rastreabilidade automática — o Azure DevOps registra o vínculo pai/filho entre os níveis, permitindo navegar de um Epic até seus Tasks diretamente no board.</p>
                   <div style={{ padding: "8px 12px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 6, marginTop: 8 }}>
                     <strong style={{ color: "#0369a1" }}>Dica:</strong>
-                    <span style={{ color: "#0c4a6e" }}> o PAT pode ser gerado em <em>Azure DevOps → User Settings → Personal Access Tokens</em>. Defina validade de 30–90 dias e escopo mínimo.</span>
+                    <span style={{ color: "#0c4a6e" }}> o PAT pode ser gerado em <em>Azure DevOps → User Settings → Personal Access Tokens</em>. Defina validade de 30–90 dias e escopo mínimo necessário.</span>
                   </div>
                 </div>
               </FAQ_Q>
@@ -3639,7 +3670,7 @@ export default function AgenteRequisitos() {
                     <li style={{ marginBottom: 6 }}><strong>Documentos grandes (&gt; 50 páginas):</strong> O processamento é feito em chunks. Documentos muito longos podem gerar mais de uma chamada à API, aumentando custo e tempo.</li>
                     <li style={{ marginBottom: 6 }}><strong>PDF com imagens:</strong> O app extrai apenas texto. Diagramas e tabelas em imagem são ignorados.</li>
                     <li style={{ marginBottom: 6 }}><strong>Rastreabilidade de origem:</strong> O elo entre cada artefato gerado e a seção exata do documento fonte ainda não é registrado automaticamente (melhoria planejada).</li>
-                    <li style={{ marginBottom: 6 }}><strong>Custo da API:</strong> O uso do Claude Sonnet consome créditos Anthropic. Para documentos grandes, use a fase de pré-resumo para reduzir tokens enviados.</li>
+                    <li style={{ marginBottom: 6 }}><strong>Custo da API:</strong> Cada chamada ao modelo de linguagem consome tokens cobrados pelo provedor de LLM. Para documentos grandes, use a fase de pré-resumo para reduzir os tokens enviados.</li>
                     <li><strong>Azure DevOps PAT:</strong> O token trafega no cliente. Use tokens de validade curta e revogue-os após o uso.</li>
                   </ul>
                 </div>
@@ -3647,7 +3678,7 @@ export default function AgenteRequisitos() {
 
               {/* Rodapé */}
               <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 14, marginTop: 8, fontSize: 11, color: C.muted, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-                <span>Agente de Requisitos · Stack: React 19 + Vite + Claude API + Azure DevOps REST</span>
+                <span>Agente de Requisitos · Stack: React 19 + Vite + LLM API + Azure DevOps REST</span>
                 <span>rafael.cotrin@ytecnologia.com</span>
               </div>
             </div>
