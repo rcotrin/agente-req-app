@@ -3491,16 +3491,20 @@ export default function AgenteRequisitos() {
               <FAQ_Q n="FASE 0" q="Upload e tipo de documento" accent="#0284c7">
                 <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
                   <p style={{ marginTop: 0 }}>Arraste ou clique na área de upload para carregar seu arquivo. O app lê PDF, DOCX, TXT e MD.</p>
-                  <p>Escolha o <strong>Tipo de Documento</strong> que define como os artefatos serão nomeados e estruturados:</p>
+                  <p>Escolha o <strong>Tipo de Documento</strong> de acordo com o impacto da documentação no sistema:</p>
                   <div style={{ display: "flex", gap: 12, flexWrap: "wrap", margin: "8px 0" }}>
                     <div style={{ flex: 1, minWidth: 200, padding: "10px 14px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8 }}>
-                      <div style={{ fontWeight: 700, color: "#0369a1", marginBottom: 4 }}>COR (Correção)</div>
-                      <div style={{ color: "#475569", fontSize: 11 }}>Usa a nomenclatura de <em>Casos de Uso</em> (UC, Fluxo Principal, Fluxo Alternativo). Ideal para sistemas com interações claras entre ator e sistema.</div>
+                      <div style={{ fontWeight: 700, color: "#0369a1", marginBottom: 4 }}>COR do Sistema</div>
+                      <div style={{ color: "#475569", fontSize: 11 }}>Use quando o documento <strong>impacta a arquitetura macro</strong> do sistema — mudanças estruturais, novos módulos centrais ou alterações que afetam múltiplas partes do produto.</div>
                     </div>
                     <div style={{ flex: 1, minWidth: 200, padding: "10px 14px", background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: 8 }}>
-                      <div style={{ fontWeight: 700, color: "#7c3aed", marginBottom: 4 }}>Produto (Feature-Based)</div>
-                      <div style={{ color: "#475569", fontSize: 11 }}>Usa a nomenclatura de <em>Histórias de Usuário</em> (HU, Critérios de Aceite). Ideal para produtos ágeis orientados a valor.</div>
+                      <div style={{ fontWeight: 700, color: "#7c3aed", marginBottom: 4 }}>Produto / Funcionalidade</div>
+                      <div style={{ color: "#475569", fontSize: 11 }}>Use quando o documento <strong>não impacta o COR</strong> — evoluções, melhorias ou novas funcionalidades isoladas que não alteram a estrutura central do sistema.</div>
                     </div>
+                  </div>
+                  <div style={{ padding: "8px 12px", background: "#fefce8", border: "1px solid #fde047", borderRadius: 6, marginTop: 4 }}>
+                    <strong style={{ color: "#854d0e" }}>Em ambos os casos</strong>
+                    <span style={{ color: "#713f12" }}>, os artefatos gerados seguem a mesma estrutura: Épico → Feature/UC → HU → Caso de Teste. O tipo de documento apenas indica o contexto de impacto para orientar a equipe.</span>
                   </div>
                   <p>Clique em <strong>"Extrair Texto"</strong> para iniciar o processamento.</p>
                 </div>
@@ -3534,8 +3538,8 @@ export default function AgenteRequisitos() {
               <FAQ_Q n="FASE 3" q="Geração de Features / Casos de Uso" accent="#0891b2">
                 <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
                   <div style={{ padding: "8px 12px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 6, marginBottom: 10 }}>
-                    <strong style={{ color: "#0369a1" }}>Feature e Caso de Uso (UC) são a mesma coisa.</strong>
-                    <span style={{ color: "#0c4a6e" }}> O termo varia conforme o modo selecionado, mas representa o mesmo conceito: uma funcionalidade do sistema descrita pela interação entre um <em>ator</em> e o <em>sistema</em>. A nomenclatura "Caso de Uso" facilita a associação direta com as funcionalidades identificadas no documento-fonte.</span>
+                    <strong style={{ color: "#0369a1" }}>Feature e Caso de Uso (UC) são sempre a mesma coisa.</strong>
+                    <span style={{ color: "#0c4a6e" }}> Independente do tipo de documento (COR ou Produto/Funcionalidade), os dois termos representam o mesmo conceito: <strong>uma funcionalidade</strong> do sistema descrita pela interação entre um <em>ator</em> e o <em>sistema</em>. São intercambiáveis — usamos ambos para facilitar a associação com as funcionalidades identificadas no documento-fonte.</span>
                   </div>
                   <p style={{ marginTop: 0 }}>Para cada Épico, o modelo identifica as funcionalidades e as estrutura com:</p>
                   <ul style={{ paddingLeft: 18, margin: "6px 0" }}>
