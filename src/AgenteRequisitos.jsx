@@ -1107,45 +1107,76 @@ function wikiMsgFile(ep, ucsEp, modulo) {
 // ── Requisitos Funcionais ────────────────────────────────────────
 function wikiRFFile(ep, ucsEp, husEp, modulo) {
   const titulo = ep.titulo;
+  // Usa os RF gerados pelo enrichRFRNF em uc.requisitosFuncionais
+  const rfs = ucsEp.flatMap(uc =>
+    (uc.requisitosFuncionais || []).map(rf => ({ ...rf, ucId: uc.ucId, ftId: uc.ftId, ucTitulo: uc.titulo }))
+  );
   let md = wikiYaml(`Requisitos Funcionais - ${titulo}`, modulo, "requisitos-funcionais");
   md += `# Requisitos Funcionais - ${titulo}\n\n`;
-  md += `## Tabela\n\n| ID | Nome | Descricao | Prioridade | Status | Casos de Uso |\n|----|------|-----------|-----------|--------|______________|\n`.replace("______________", "--------------");
-  husEp.forEach(h => {
-    const uc = ucsEp.find(u => u.ucId === h.ucId);
-    const desc = `O sistema deve ${(h.quero || h.titulo).toLowerCase()}`;
-    md += `| ${h.reqId} | ${h.titulo} | ${desc.slice(0, 60)} | Alta | Em elaboracao | ${uc?.ftId || "—"} |\n`;
-  });
+  md += `## Tabela\n\n| ID | Descricao | Origem no Fluxo | Prioridade | Status | Caso de Uso |\n|----|-----------|----------------|-----------|--------|-------------|\n`;
+  if (rfs.length) {
+    rfs.forEach(rf => {
+      const desc = (rf.descricao || "").slice(0, 80);
+      md += `| ${rf.id} | ${desc} | ${rf.origemPasso || "—"} | Alta | Em elaboracao | ${rf.ftId} |\n`;
+    });
+  } else {
+    md += `| RF-MOD-001 | O sistema deve... | FP-1 | Alta | Em elaboracao | — |\n`;
+  }
   md += `\n---\n\n## Detalhamento\n\n`;
-  husEp.forEach(h => {
-    const uc = ucsEp.find(u => u.ucId === h.ucId);
-    const ucSlug = uc ? `${uc.ftId}-${toSlug(uc.titulo)}` : null;
-    const rns = (h.regrasNegocio || []).map(r => r.id).join(", ") || "—";
-    md += `### ${h.reqId} - ${h.titulo}\n\n`;
-    md += `**Descricao:** O sistema deve ${(h.quero || h.titulo).toLowerCase()}.\n\n`;
-    md += `**Criterios de Aceite:**\n`;
-    if ((h.criteriosAceitacao || []).length) {
-      h.criteriosAceitacao.forEach(c => { md += `- [ ] ${c.id} — ${c.descricao}\n`; });
-    } else { md += `- [ ] Criterio 1\n`; }
-    md += `\n**Dependencias:** —\n\n`;
-    md += ucSlug ? `**Casos de Uso:** [${uc.ftId}](Casos-de-Uso/${ucSlug})\n\n` : `**Casos de Uso:** —\n\n`;
-    md += `**Regras de Negocio:** ${rns !== "—" ? `[${rns}](Regras-de-Negocio)` : "—"}\n\n`;
-  });
+  if (rfs.length) {
+    rfs.forEach(rf => {
+      const uc = ucsEp.find(u => u.ucId === rf.ucId);
+      const ucSlug = uc ? `${uc.ftId}-${toSlug(uc.titulo)}` : null;
+      md += `### ${rf.id}\n\n`;
+      md += `**Descricao:** ${rf.descricao}\n\n`;
+      md += `**Origem no Fluxo:** ${rf.origemPasso || "—"}\n\n`;
+      md += ucSlug ? `**Caso de Uso:** [${uc.ftId} — ${uc.titulo}](Casos-de-Uso/${ucSlug})\n\n` : `**Caso de Uso:** —\n\n`;
+      md += `**Prioridade:** Alta\n\n**Status:** Em elaboracao\n\n`;
+    });
+  } else {
+    md += `### RF-MOD-001\n\n**Descricao:** O sistema deve...\n\n**Origem no Fluxo:** —\n\n**Caso de Uso:** —\n\n**Prioridade:** Alta\n\n**Status:** Em elaboracao\n\n`;
+  }
   return md + wikiHistorico();
 }
 
 // ── Requisitos Não Funcionais ────────────────────────────────────
-function wikiRNFFile(ep, modulo) {
+function wikiRNFFile(ep, ucsEp, modulo) {
   const titulo = ep.titulo;
+  // Usa os RNF gerados pelo enrichRFRNF em uc.requisitosNaoFuncionais
+  const rnfs = ucsEp.flatMap(uc =>
+    (uc.requisitosNaoFuncionais || []).map(rnf => ({ ...rnf, ucId: uc.ucId, ftId: uc.ftId, ucTitulo: uc.titulo }))
+  );
   let md = wikiYaml(`Requisitos Nao Funcionais - ${titulo}`, modulo, "requisitos-nao-funcionais");
   md += `# Requisitos Nao Funcionais - ${titulo}\n\n`;
-  md += `## Tabela\n\n| ID | Categoria | Descricao | Metrica | Prioridade |\n|----|-----------|-----------|---------|__________|\n`.replace("__________", "----------");
-  md += `| RNF001 | Performance | Resposta da operacao principal | <= 500ms P95 | Alta |\n`;
-  md += `| RNF002 | Disponibilidade | Uptime do modulo | >= 99,5% ao mes | Alta |\n`;
-  md += `| RNF003 | Seguranca | Criptografia de dados sensiveis | AES-256 | Alta |\n`;
-  md += `| RNF004 | Escalabilidade | Suporte a picos de transacoes | Definir TPS | Media |\n`;
-  md += `| RNF005 | Usabilidade | Acessibilidade minima | WCAG 2.1 AA | Media |\n`;
+  md += `## Tabela\n\n| ID | Categoria | Descricao | Metrica | Prioridade | Caso de Uso |\n|----|-----------|-----------|---------|------------|-------------|\n`;
+  if (rnfs.length) {
+    rnfs.forEach(rnf => {
+      const desc = (rnf.descricao || "").slice(0, 70);
+      md += `| ${rnf.id} | ${rnf.categoria || "—"} | ${desc} | ${rnf.metrica || "A definir"} | Alta | ${rnf.ftId} |\n`;
+    });
+  } else {
+    md += `| RNF-MOD-001 | Performance | O sistema deve responder em ate 500ms | <= 500ms P95 | Alta | — |\n`;
+    md += `| RNF-MOD-002 | Disponibilidade | O sistema deve garantir uptime do modulo | >= 99,5% ao mes | Alta | — |\n`;
+    md += `| RNF-MOD-003 | Seguranca | O sistema deve criptografar dados sensiveis | AES-256 | Alta | — |\n`;
+  }
   md += `\n---\n\n## Detalhamento por Categoria\n\n`;
-  md += `### Performance\n> ...\n\n### Seguranca\n> ...\n\n### Escalabilidade\n> ...\n\n### Disponibilidade\n> SLA, janelas de manutencao, RTO/RPO.\n\n### Usabilidade\n> Padroes de acessibilidade e UX.\n\n`;
+  if (rnfs.length) {
+    const byCategoria = {};
+    rnfs.forEach(rnf => { const cat = rnf.categoria || "Geral"; if (!byCategoria[cat]) byCategoria[cat] = []; byCategoria[cat].push(rnf); });
+    Object.entries(byCategoria).forEach(([cat, items]) => {
+      md += `### ${cat}\n\n`;
+      items.forEach(rnf => {
+        const uc = ucsEp.find(u => u.ucId === rnf.ucId);
+        const ucSlug = uc ? `${uc.ftId}-${toSlug(uc.titulo)}` : null;
+        md += `**${rnf.id}** — ${rnf.descricao}\n`;
+        md += `- **Metrica:** ${rnf.metrica || "A definir"}\n`;
+        md += ucSlug ? `- **Caso de Uso:** [${uc.ftId} — ${uc.titulo}](Casos-de-Uso/${ucSlug})\n` : `- **Caso de Uso:** —\n`;
+        md += `\n`;
+      });
+    });
+  } else {
+    md += `### Performance\n> A definir — tempo de resposta e throughput esperados.\n\n### Seguranca\n> A definir — controles de acesso e criptografia.\n\n### Escalabilidade\n> A definir — capacidade maxima e comportamento sob carga.\n\n### Disponibilidade\n> A definir — SLA, janelas de manutencao, RTO/RPO.\n\n### Usabilidade\n> A definir — padroes de acessibilidade e UX.\n\n`;
+  }
   return md + wikiHistorico();
 }
 
@@ -1250,50 +1281,74 @@ function wikiCORMSGGlobal(allUCs) {
 }
 
 function wikiCORRFGlobal(allUCs, allHus) {
+  // Usa os RF gerados pelo enrichRFRNF em uc.requisitosFuncionais
+  const rfs = allUCs.flatMap(uc =>
+    (uc.requisitosFuncionais || []).map(rf => ({ ...rf, ucId: uc.ucId, ftId: uc.ftId, ucTitulo: uc.titulo }))
+  );
   let md = wikiYaml("Requisitos Funcionais - COR", "COR", "requisitos-funcionais");
   md += `# Requisitos Funcionais - COR\n\n`;
-  md += `## Tabela\n\n| ID | Nome | Descricao | Prioridade | Status | Casos de Uso |\n|----|------|-----------|-----------|--------|______________|\n`.replace("______________", "--------------");
-  if (allHus.length) {
-    allHus.forEach(h => {
-      const uc = allUCs.find(u => u.ucId === h.ucId);
-      const desc = `O sistema deve ${(h.quero || h.titulo).toLowerCase()}`;
-      md += `| ${h.reqId} | ${h.titulo} | ${desc.slice(0, 60)} | Alta | Em elaboracao | ${uc?.ftId || "—"} |\n`;
+  md += `## Tabela\n\n| ID | Descricao | Origem no Fluxo | Prioridade | Status | Caso de Uso |\n|----|-----------|----------------|-----------|--------|-------------|\n`;
+  if (rfs.length) {
+    rfs.forEach(rf => {
+      const desc = (rf.descricao || "").slice(0, 80);
+      md += `| ${rf.id} | ${desc} | ${rf.origemPasso || "—"} | Alta | Em elaboracao | ${rf.ftId} |\n`;
     });
   } else {
-    md += `| RF001 | Nome | O sistema deve... | Alta | Em elaboracao | FT001 |\n`;
+    md += `| RF-COR-001 | O sistema deve... | FP-1 | Alta | Em elaboracao | — |\n`;
   }
   md += `\n---\n\n## Detalhamento\n\n`;
-  if (allHus.length) {
-    allHus.forEach(h => {
-      const uc = allUCs.find(u => u.ucId === h.ucId);
+  if (rfs.length) {
+    rfs.forEach(rf => {
+      const uc = allUCs.find(u => u.ucId === rf.ucId);
       const ucSlug = uc ? `${uc.ftId}-${toSlug(uc.titulo)}` : null;
-      const rns = (h.regrasNegocio || []).map(r => r.id).join(", ") || "—";
-      md += `### ${h.reqId} - ${h.titulo}\n\n`;
-      md += `**Descricao:** O sistema deve ${(h.quero || h.titulo).toLowerCase()}.\n\n`;
-      md += `**Criterios de Aceite:**\n`;
-      (h.criteriosAceitacao || []).forEach(c => { md += `- [ ] ${c.id} — ${c.descricao}\n`; });
-      if (!(h.criteriosAceitacao || []).length) md += `- [ ] Criterio 1\n`;
-      md += `\n**Dependencias:** —\n\n`;
-      md += ucSlug ? `**Casos de Uso:** [${uc.ftId}](Casos-de-Uso/${ucSlug})\n\n` : `**Casos de Uso:** —\n\n`;
-      md += `**Regras de Negocio:** ${rns !== "—" ? `[${rns}](Regras-de-Negocio-Globais)` : "—"}\n\n`;
+      md += `### ${rf.id}\n\n`;
+      md += `**Descricao:** ${rf.descricao}\n\n`;
+      md += `**Origem no Fluxo:** ${rf.origemPasso || "—"}\n\n`;
+      md += ucSlug ? `**Caso de Uso:** [${uc.ftId} — ${uc.titulo}](Casos-de-Uso/${ucSlug})\n\n` : `**Caso de Uso:** —\n\n`;
+      md += `**Prioridade:** Alta\n\n**Status:** Em elaboracao\n\n`;
     });
   } else {
-    md += `### RF001 - Nome do Requisito\n\n**Descricao:** O sistema deve...\n\n**Criterios de Aceite:**\n- [ ] Criterio 1\n\n**Dependencias:** —\n\n**Casos de Uso:** —\n\n**Regras de Negocio:** —\n\n`;
+    md += `### RF-COR-001\n\n**Descricao:** O sistema deve...\n\n**Origem no Fluxo:** —\n\n**Caso de Uso:** —\n\n**Prioridade:** Alta\n\n**Status:** Em elaboracao\n\n`;
   }
   return md + wikiHistorico();
 }
 
-function wikiCORRNF() {
+function wikiCORRNF(allUCs) {
+  // Usa os RNF gerados pelo enrichRFRNF em uc.requisitosNaoFuncionais
+  const rnfs = (allUCs || []).flatMap(uc =>
+    (uc.requisitosNaoFuncionais || []).map(rnf => ({ ...rnf, ucId: uc.ucId, ftId: uc.ftId, ucTitulo: uc.titulo }))
+  );
   let md = wikiYaml("Requisitos Nao Funcionais - COR", "COR", "requisitos-nao-funcionais");
   md += `# Requisitos Nao Funcionais - COR\n\n`;
-  md += `## Tabela\n\n| ID | Categoria | Descricao | Metrica | Prioridade |\n|----|-----------|-----------|---------|----------|\n`;
-  md += `| RNF001 | Performance | Resposta da operacao principal | <= 500ms P95 | Alta |\n`;
-  md += `| RNF002 | Disponibilidade | Uptime do modulo | >= 99,5% ao mes | Alta |\n`;
-  md += `| RNF003 | Seguranca | Criptografia de dados sensiveis | AES-256 | Alta |\n`;
-  md += `| RNF004 | Escalabilidade | Suporte a picos de transacoes | Definir TPS | Media |\n`;
-  md += `| RNF005 | Usabilidade | Acessibilidade minima | WCAG 2.1 AA | Media |\n`;
+  md += `## Tabela\n\n| ID | Categoria | Descricao | Metrica | Prioridade | Caso de Uso |\n|----|-----------|-----------|---------|------------|-------------|\n`;
+  if (rnfs.length) {
+    rnfs.forEach(rnf => {
+      const desc = (rnf.descricao || "").slice(0, 70);
+      md += `| ${rnf.id} | ${rnf.categoria || "—"} | ${desc} | ${rnf.metrica || "A definir"} | Alta | ${rnf.ftId} |\n`;
+    });
+  } else {
+    md += `| RNF-COR-001 | Performance | O sistema deve responder em ate 500ms | <= 500ms P95 | Alta | — |\n`;
+    md += `| RNF-COR-002 | Disponibilidade | O sistema deve garantir uptime global | >= 99,5% ao mes | Alta | — |\n`;
+    md += `| RNF-COR-003 | Seguranca | O sistema deve criptografar dados sensiveis | AES-256 | Alta | — |\n`;
+  }
   md += `\n---\n\n## Detalhamento por Categoria\n\n`;
-  md += `### Performance\n> ...\n\n### Seguranca\n> ...\n\n### Escalabilidade\n> ...\n\n### Disponibilidade\n> SLA, janelas de manutencao, RTO/RPO.\n\n### Usabilidade\n> Padroes de acessibilidade e UX.\n\n`;
+  if (rnfs.length) {
+    const byCategoria = {};
+    rnfs.forEach(rnf => { const cat = rnf.categoria || "Geral"; if (!byCategoria[cat]) byCategoria[cat] = []; byCategoria[cat].push(rnf); });
+    Object.entries(byCategoria).forEach(([cat, items]) => {
+      md += `### ${cat}\n\n`;
+      items.forEach(rnf => {
+        const uc = (allUCs || []).find(u => u.ucId === rnf.ucId);
+        const ucSlug = uc ? `${uc.ftId}-${toSlug(uc.titulo)}` : null;
+        md += `**${rnf.id}** — ${rnf.descricao}\n`;
+        md += `- **Metrica:** ${rnf.metrica || "A definir"}\n`;
+        md += ucSlug ? `- **Caso de Uso:** [${uc.ftId} — ${uc.titulo}](Casos-de-Uso/${ucSlug})\n` : `- **Caso de Uso:** —\n`;
+        md += `\n`;
+      });
+    });
+  } else {
+    md += `### Performance\n> A definir — tempo de resposta e throughput esperados.\n\n### Seguranca\n> A definir — controles de acesso e criptografia.\n\n### Escalabilidade\n> A definir — capacidade maxima e comportamento sob carga.\n\n### Disponibilidade\n> A definir — SLA, janelas de manutencao, RTO/RPO.\n\n### Usabilidade\n> A definir — padroes de acessibilidade e UX.\n\n`;
+  }
   return md + wikiHistorico();
 }
 
@@ -1388,7 +1443,7 @@ function generateWikiFiles(epicos, ucs, hus, wikiRoot, produtoTitulo, isCOR) {
   files.push({ path: `${corBase}/Regras-de-Negocio-Globais.md`,    content: wikiCORRNGlobal(globalHUs, globalUCs) });
   files.push({ path: `${corBase}/Mensagens-de-Sistema-Globais.md`, content: wikiCORMSGGlobal(globalUCs) });
   files.push({ path: `${corBase}/Requisitos-Funcionais-Globais.md`, content: wikiCORRFGlobal(globalUCs, globalHUs) });
-  files.push({ path: `${corBase}/Requisitos-Nao-Funcionais.md`,    content: wikiCORRNF() });
+  files.push({ path: `${corBase}/Requisitos-Nao-Funcionais.md`,    content: wikiCORRNF(globalUCs) });
   files.push({ path: `${corBase}/Arquitetura-Geral.md`,            content: wikiArquiteturaGeral(epicos) });
   files.push({ path: `${corBase}/Glossario.md`,                    content: wikiGlossario(epicos) });
   files.push({ path: `${corBase}/Padroes-e-Convencoes.md`,         content: wikiPadroesConvencoes() });
@@ -1418,7 +1473,7 @@ function generateWikiFiles(epicos, ucs, hus, wikiRoot, produtoTitulo, isCOR) {
     files.push({ path: `${base}/Regras-de-Negocio.md`,           content: wikiRNFile(ep, ucsEp, husEp, modulo) });
     files.push({ path: `${base}/Mensagens-de-Sistema.md`,        content: wikiMsgFile(ep, ucsEp, modulo) });
     files.push({ path: `${base}/Requisitos-Funcionais.md`,       content: wikiRFFile(ep, ucsEp, husEp, modulo) });
-    files.push({ path: `${base}/Requisitos-Nao-Funcionais.md`,   content: wikiRNFFile(ep, modulo) });
+    files.push({ path: `${base}/Requisitos-Nao-Funcionais.md`,   content: wikiRNFFile(ep, ucsEp, modulo) });
     files.push({ path: `${base}/.order`, content: [modulo, "Casos-de-Uso", "Regras-de-Negocio", "Mensagens-de-Sistema", "Requisitos-Funcionais", "Requisitos-Nao-Funcionais"].join("\n") });
 
     const ucOrder = ["Casos-de-Uso"];
