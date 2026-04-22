@@ -377,10 +377,10 @@ async function enrichRNNames(hus) {
 
   const system = `Você é um analista de requisitos sênior. Para cada regra de negócio recebida, gere um NOME curto e semântico.
 REGRAS DO NOME:
-1. Verbo no infinitivo + complemento, Title Case, máx 5 palavras, SEM artigos e SEM preposições.
-2. Deve capturar a AÇÃO de negócio central da regra.
-3. Exemplos corretos: "Limitar Transação Diária", "Bloquear Conta Inadimplente", "Validar Prazo Liquidação PIX", "Exigir Autenticação Duplo Fator".
-4. Exemplos ERRADOS: "Limite Diário Transação", "Bloqueio Conta", "O valor não pode", "Regra sobre limite".
+1. Substantivo composto em Title Case, máx 4 palavras, SEM artigos e SEM preposições.
+2. Deve capturar o CONCEITO de negócio central da regra — é um rótulo identificador, não uma ação.
+3. Exemplos corretos: "Limite Diário Transação", "Prazo Liquidação PIX", "Bloqueio Conta Inadimplente", "Autenticação Duplo Fator".
+4. Exemplos ERRADOS: "Limitar Transação", "Bloquear Conta", "O valor não pode", "Regra sobre limite".
 Retorne SOMENTE JSON sem markdown: {"rns":[{"id":"RN001","nome":"Nome Semantico"}]}`;
 
   const raw = await claude(
@@ -420,10 +420,10 @@ async function enrichRFRNF(hus, ucs) {
 2. REQUISITOS NÃO FUNCIONAIS (RNF): restrições de qualidade (Performance, Segurança, Disponibilidade, Usabilidade, Escalabilidade). IDs: "RNF-${prefix}-001"...
 REGRAS:
 - Máx 5 RF e 4 RNF por UC. Se não houver conteúdo suficiente, retorne arrays vazios [].
-- descricao RF: OBRIGATÓRIO iniciar com verbo no infinitivo. Ex: "Validar saldo disponível antes de autorizar a transação", "Registrar log de auditoria para cada operação". ERRADO: "O sistema deve validar...", "É necessário registrar...".
+- descricao RF: sentença declarativa modal — "O sistema deve [verbo] [complemento]." Ex: "O sistema deve validar o saldo disponível antes de autorizar a transação.", "O sistema deve registrar log de auditoria para cada operação realizada." ERRADO: iniciar com verbo no infinitivo sem sujeito.
 - origemPasso: passo do FP relacionado (ex: "FP-2"). Use "" se não aplicável.
 - categoria RNF: uma de "Performance" | "Segurança" | "Disponibilidade" | "Usabilidade" | "Escalabilidade".
-- descricao RNF: OBRIGATÓRIO iniciar com verbo no infinitivo. Ex: "Processar requisição em até 500ms sob carga de 200 usuários simultâneos".
+- descricao RNF: sentença declarativa modal — "O sistema deve [verbo] [complemento]." Ex: "O sistema deve processar a requisição em até 500ms sob carga de 200 usuários simultâneos."
 - metrica RNF: valor mensurável quando disponível (ex: "<= 500ms"), caso contrário "A definir".
 Retorne SOMENTE JSON sem markdown:
 {"rf":[{"id":"RF-${prefix}-001","descricao":"string","origemPasso":"FP-2"}],"rnf":[{"id":"RNF-${prefix}-001","categoria":"Performance","descricao":"string","metrica":"string"}]}`;
