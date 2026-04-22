@@ -1640,16 +1640,18 @@ const PHASES = [
 ];
 
 const C = {
-  bg: "#f0f3fa",       surface: "#ffffff",    border: "#dde3f0",
-  accent: "#0369a1",   green: "#166534",      amber: "#92400e",
-  coral: "#9a3412",    red: "#991b1b",        muted: "#94a3b8",
-  text: "#334155",     textDim: "#64748b",    textBright: "#0f172a",
-  purple: "#5b21b6",
+  bg: "#F9F9F9",        surface: "#FFFFFF",    border: "#E8ECF5",
+  accent: "#39ADE3",    navy: "#00366C",       navyMed: "#07447A",
+  cyanLight: "#87D5F6", sectionBg: "#E9F5FA",
+  green: "#166534",     amber: "#92400e",      coral: "#9a3412",
+  red: "#991b1b",       muted: "#94a3b8",
+  text: "#627C89",      textDim: "#74768B",    textBright: "#444762",
+  purple: "#00366C",    // mapeado para Navy yTecnologia
 };
 
 const TYPE_COLOR = {
-  "Épico": "#5b21b6", "Feature/UC": "#0369a1",
-  "Requisito/HU": "#166534", "Caso de Teste": "#9a3412",
+  "Épico": "#00366C", "Feature/UC": "#07447A",
+  "Requisito/HU": "#39ADE3", "Caso de Teste": "#0284c7",
 };
 
 // ════════════════════════════════════════════════════════════════════
@@ -2397,7 +2399,7 @@ export default function AgenteRequisitos() {
       <div key={key} className="card" style={{ border: `1px solid ${migrated ? C.amber + "30" : open ? color + "30" : color + "15"}`, background: open ? "#05070d" : C.surface }}>
         <div className="card-header" onClick={() => setExpanded(open ? null : key)}>
           <span className="badge" style={{ background: color + "18", color }}>{tipo}</span>
-          <span style={{ fontSize: 11, color, fontFamily: "'Syne',sans-serif", fontWeight: 700 }}>{id}</span>
+          <span style={{ fontSize: 11, color, fontFamily: "'Manrope',sans-serif", fontWeight: 700 }}>{id}</span>
           <span style={{ flex: 1, fontSize: 12, color: open ? C.text : C.textDim, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{titulo}</span>
           {migrated && <span className="badge" style={{ background: C.amber + "15", color: C.amber, fontSize: 9 }}>migrado</span>}
           <span style={{ color: color + "80", fontSize: 10, marginLeft: 4 }}>{open ? "▲" : "▼"}</span>
@@ -2510,28 +2512,28 @@ export default function AgenteRequisitos() {
   // ════════════════════════════════════════════════════════════════════
 
   return (
-    <div style={{ fontFamily: "'IBM Plex Mono','Courier New',monospace", background: C.bg, minHeight: "100vh", color: C.text, zoom: 1.2 }}>
-      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+    <div style={{ fontFamily: "'Roboto','system-ui',sans-serif", background: C.bg, minHeight: "100vh", color: C.text, zoom: 1.2 }}>
+      <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Condensed:wght@500;700&family=Nunito:wght@700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
       <style>{`
         * { box-sizing: border-box }
         input, textarea {
-          background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px;
-          color: #1e293b; padding: 10px 14px; font-family: inherit; font-size: 13px;
+          background: #FFFFFF; border: 1px solid #E8ECF5; border-radius: 6px;
+          color: #444762; padding: 10px 14px; font-family: inherit; font-size: 13px;
           outline: none; width: 100%; transition: border-color .15s, box-shadow .15s;
         }
-        input:focus, textarea:focus { border-color: #0369a1; box-shadow: 0 0 0 3px #0369a114 }
-        .dg { border-color: #0369a1 !important; background: #f0f7ff !important }
+        input:focus, textarea:focus { border-color: #39ADE3; box-shadow: 0 0 0 3px #39ADE314 }
+        .dg { border-color: #39ADE3 !important; background: #E9F5FA !important }
         ::-webkit-scrollbar { width: 5px; height: 5px }
-        ::-webkit-scrollbar-track { background: #f0f3fa }
-        ::-webkit-scrollbar-thumb { background: #c4cfe0; border-radius: 3px }
-        ::-webkit-scrollbar-thumb:hover { background: #a0b0c8 }
+        ::-webkit-scrollbar-track { background: #F9F9F9 }
+        ::-webkit-scrollbar-thumb { background: #E8ECF5; border-radius: 3px }
+        ::-webkit-scrollbar-thumb:hover { background: #87D5F6 }
         @keyframes spin { to { transform: rotate(360deg) } }
         @keyframes fi { from { opacity: 0; transform: translateY(5px) } to { opacity: 1; transform: none } }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
         .fi { animation: fi .2s ease both }
         .btn {
-          cursor: pointer; border-radius: 7px; font-family: 'Syne', sans-serif;
-          font-weight: 700; font-size: 13px; padding: 11px 22px;
+          cursor: pointer; border-radius: 6px; font-family: 'Roboto', sans-serif;
+          font-weight: 500; font-size: 13px; padding: 11px 22px;
           transition: all .15s; border: none; white-space: nowrap; display: inline-flex;
           align-items: center; gap: 6px;
         }
@@ -2539,36 +2541,36 @@ export default function AgenteRequisitos() {
         .btn:active:not(:disabled) { transform: translateY(0) }
         .btn:disabled { opacity: .4; cursor: not-allowed }
         .wi { transition: background .12s }
-        .wi:hover { background: #f0f5ff !important }
-        .card { border-radius: 8px; border: 1px solid #dde3f0; background: #ffffff; overflow: hidden; margin-bottom: 6px; transition: border-color .15s, box-shadow .15s }
-        .card:hover { border-color: #b0c0d8; box-shadow: 0 2px 8px #0369a10d }
+        .wi:hover { background: #E9F5FA !important }
+        .card { border-radius: 7px; border: 1px solid #E8ECF5; background: #FFFFFF; overflow: hidden; margin-bottom: 6px; transition: border-color .15s, box-shadow .15s }
+        .card:hover { border-color: #87D5F6; box-shadow: 0 2px 8px #39ADE30d }
         .card-header { padding: 10px 14px; display: flex; align-items: center; gap: 8px; cursor: pointer }
-        .badge { font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 700; letter-spacing: .03em; flex-shrink: 0 }
+        .badge { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 500; letter-spacing: .03em; flex-shrink: 0; background: #E8ECF5; color: #74768B }
         .devops-tab { background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-family: inherit; transition: all .15s; padding: 5px 12px; margin-bottom: -1px; font-size: 11px; font-weight: 600 }
         .devops-tab:hover { opacity: .75 }
-        .devops-tag { font-size: 10px; padding: 2px 9px; border-radius: 10px; background: #eef2f9; border: 1px solid #d0daea; color: #4a6080; font-family: inherit }
-        .section-panel { background: #ffffff; border: 1px solid #dde3f0; border-radius: 10px; padding: 16px; margin-bottom: 16px }
+        .devops-tag { font-size: 10px; padding: 2px 9px; border-radius: 20px; background: #E8ECF5; border: 1px solid #E8ECF5; color: #74768B; font-family: inherit }
+        .section-panel { background: #FFFFFF; border: 1px solid #E8ECF5; border-radius: 7px; padding: 16px; margin-bottom: 16px }
         .devops-html-preview table { border-collapse: collapse; width: 100%; margin: 6px 0 }
-        .devops-html-preview td, .devops-html-preview th { padding: 4px 10px; border: 1px solid #e2e8f0; font-size: 12px }
-        .devops-html-preview th { background: #f8fafc; color: #475569; font-weight: 600; text-align: left; white-space: nowrap }
+        .devops-html-preview td, .devops-html-preview th { padding: 4px 10px; border: 1px solid #E8ECF5; font-size: 12px }
+        .devops-html-preview th { background: #E9F5FA; color: #444762; font-weight: 600; text-align: left; white-space: nowrap }
         .devops-html-preview ul, .devops-html-preview ol { margin: 4px 0; padding-left: 20px }
-        .devops-html-preview li { margin-bottom: 3px; color: #475569 }
-        .devops-html-preview h3 { color: #1e293b; font-size: 13px; margin: 8px 0 4px; font-family: 'Syne', sans-serif }
-        .devops-html-preview h4 { color: #334155; font-size: 12px; margin: 8px 0 3px }
-        .devops-html-preview p { margin: 3px 0; color: #475569 }
-        .devops-html-preview b { color: #334155 }
-        .devops-html-preview hr { border: none; border-top: 1px solid #e8ecf4; margin: 8px 0 }
+        .devops-html-preview li { margin-bottom: 3px; color: #627C89 }
+        .devops-html-preview h3 { color: #444762; font-size: 13px; margin: 8px 0 4px; font-family: 'Nunito', sans-serif }
+        .devops-html-preview h4 { color: #627C89; font-size: 12px; margin: 8px 0 3px }
+        .devops-html-preview p { margin: 3px 0; color: #627C89 }
+        .devops-html-preview b { color: #444762 }
+        .devops-html-preview hr { border: none; border-top: 1px solid #E8ECF5; margin: 8px 0 }
         .hierarchy-line { border-left: 2px solid; padding-left: 10px }
       `}</style>
 
       {/* Header */}
-      <div style={{ background: "#ffffff", borderBottom: `1px solid ${C.border}`, padding: "16px 28px", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", boxShadow: "0 1px 4px #0369a10e" }}>
-        <div style={{ width: 10, height: 10, borderRadius: "50%", background: C.accent, flexShrink: 0 }} />
-        <span style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 18, color: C.textBright, letterSpacing: "-0.01em" }}>Agente de Requisitos</span>
+      <div style={{ background: "#FFFFFF", borderBottom: `1px solid ${C.border}`, padding: "16px 28px", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", boxShadow: "0 2px 8px #00366C0e" }}>
+        <div style={{ width: 10, height: 10, borderRadius: "50%", background: "linear-gradient(135deg, #00366C, #39ADE3)", flexShrink: 0 }} />
+        <span style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 800, fontSize: 18, background: "linear-gradient(30deg, #00366C 0%, #39ADE3 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", letterSpacing: "-0.01em" }}>Agente de Requisitos</span>
         {(isCOR || produtoTitulo) && (
           <>
             <span style={{ color: C.border, fontSize: 18, margin: "0 2px" }}>│</span>
-            <span style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 15, color: isCOR ? C.green : C.accent }}>
+            <span style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 700, fontSize: 15, color: isCOR ? C.green : C.accent }}>
               {isCOR ? "COR — Global" : produtoTitulo}
             </span>
           </>
@@ -2625,15 +2627,15 @@ export default function AgenteRequisitos() {
               style={{
                 flex: "0 0 auto", minWidth: 90, padding: "11px 8px", textAlign: "center",
                 cursor: reachable && !loading ? "pointer" : "default",
-                borderBottom: `2px solid ${active ? C.accent : done ? C.accent + "60" : "transparent"}`,
-                color: active ? C.accent : done ? C.accent : "#b0bcd0",
-                background: active ? C.accent + "0c" : "transparent",
+                borderBottom: `2px solid ${active ? C.navy : done ? C.accent : "transparent"}`,
+                color: active ? C.navy : done ? C.accent : "#b0bcd0",
+                background: active ? C.sectionBg : "transparent",
                 transition: "all .15s", position: "relative",
               }}>
               <div style={{ fontSize: 14, marginBottom: 4, lineHeight: 1 }}>
                 {done && !active ? <span style={{ color: C.green, fontSize: 13 }}>✓</span> : p.icon}
               </div>
-              <div style={{ fontSize: 10, fontFamily: "'Syne',sans-serif", fontWeight: 700, letterSpacing: "0.04em" }}>{p.label}</div>
+              <div style={{ fontSize: 10, fontFamily: "'Manrope',sans-serif", fontWeight: 700, letterSpacing: "0.04em" }}>{p.label}</div>
             </div>
           );
         })}
@@ -2665,12 +2667,12 @@ export default function AgenteRequisitos() {
           <div className="fi">
             {/* Tipo: COR global ou Produto específico */}
             <div style={{ marginBottom: 22 }}>
-              <label style={{ fontSize: 10, color: C.textDim, display: "block", marginBottom: 8, letterSpacing: "0.08em", fontFamily: "'Syne',sans-serif", fontWeight: 700 }}>
+              <label style={{ fontSize: 10, color: C.textDim, display: "block", marginBottom: 8, letterSpacing: "0.08em", fontFamily: "'Manrope',sans-serif", fontWeight: 700 }}>
                 TIPO DE DOCUMENTAÇÃO
               </label>
               <div style={{ display: "flex", gap: 2, background: C.surface, borderRadius: 9, padding: 3, border: `1px solid ${C.border}`, marginBottom: 12 }}>
                 <button onClick={() => setIsCOR(true)}
-                  style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, cursor: "pointer", fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 12,
+                  style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, cursor: "pointer", fontFamily: "'Manrope',sans-serif", fontWeight: 700, fontSize: 12,
                     background: isCOR ? "#070d10" : "transparent",
                     color: isCOR ? C.green : C.textDim,
                     boxShadow: isCOR ? `inset 0 0 0 1px ${C.green}30` : "none",
@@ -2678,7 +2680,7 @@ export default function AgenteRequisitos() {
                   COR — Funcionalidades Globais
                 </button>
                 <button onClick={() => setIsCOR(false)}
-                  style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, cursor: "pointer", fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 12,
+                  style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, cursor: "pointer", fontFamily: "'Manrope',sans-serif", fontWeight: 700, fontSize: 12,
                     background: !isCOR ? "#0e1420" : "transparent",
                     color: !isCOR ? C.accent : C.textDim,
                     boxShadow: !isCOR ? `inset 0 0 0 1px ${C.accent}30` : "none",
@@ -2719,7 +2721,7 @@ export default function AgenteRequisitos() {
             {/* Tab bar */}
             <div style={{ display: "flex", gap: 2, marginBottom: 24, background: C.surface, borderRadius: 9, padding: 3, border: `1px solid ${C.border}` }}>
               <button onClick={() => setMigrationMode(false)}
-                style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, cursor: "pointer", fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 12,
+                style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, cursor: "pointer", fontFamily: "'Manrope',sans-serif", fontWeight: 700, fontSize: 12,
                   background: !migrationMode ? "#0e1420" : "transparent",
                   color: !migrationMode ? C.accent : C.textDim,
                   boxShadow: !migrationMode ? `inset 0 0 0 1px ${C.accent}30` : "none",
@@ -2727,7 +2729,7 @@ export default function AgenteRequisitos() {
                 Nova Análise
               </button>
               <button onClick={() => setMigrationMode(true)}
-                style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, cursor: "pointer", fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 12,
+                style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, cursor: "pointer", fontFamily: "'Manrope',sans-serif", fontWeight: 700, fontSize: 12,
                   background: migrationMode ? "#0e1420" : "transparent",
                   color: migrationMode ? C.amber : C.textDim,
                   boxShadow: migrationMode ? `inset 0 0 0 1px ${C.amber}30` : "none",
@@ -2739,7 +2741,7 @@ export default function AgenteRequisitos() {
             {/* Tab: Nova Análise */}
             {!migrationMode && (
               <>
-                <h2 style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 22, color: C.textBright, marginBottom: 6 }}>Upload da Ata</h2>
+                <h2 style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 800, fontSize: 22, color: C.textBright, marginBottom: 6 }}>Upload da Ata</h2>
                 <p style={{ color: C.textDim, fontSize: 13, marginBottom: 24 }}>
                   Gera automaticamente: <span style={{ color: C.purple }}>Épicos (EP)</span> → <span style={{ color: C.accent }}>Features/UCs (FT)</span> → <span style={{ color: C.green }}>Requisitos/HUs (REQ)</span> → <span style={{ color: C.coral }}>Casos de Teste (CT)</span>.
                   Padrão <strong style={{ color: C.accent }}>Manter</strong> aplicado automaticamente para operações CRUD.
@@ -2752,7 +2754,7 @@ export default function AgenteRequisitos() {
                   onClick={() => document.getElementById("fi-inp").click()}
                   style={{ border: `1px dashed ${C.muted}`, borderRadius: 12, padding: "52px 24px", textAlign: "center", cursor: "pointer", background: C.surface, transition: "all .2s" }}>
                   <div style={{ fontSize: 36, marginBottom: 14, opacity: .5 }}>⬆</div>
-                  <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 15, color: C.accent, marginBottom: 6 }}>Clique ou arraste o arquivo</div>
+                  <div style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 800, fontSize: 15, color: C.accent, marginBottom: 6 }}>Clique ou arraste o arquivo</div>
                   <div style={{ fontSize: 12, color: C.muted }}>PDF · DOCX · DOC · TXT · MD</div>
                   {file && <div style={{ marginTop: 14, fontSize: 12, color: "#6a7a90" }}>📎 {file.name} ({(file.size / 1024).toFixed(1)} KB)</div>}
                 </div>
@@ -2763,7 +2765,7 @@ export default function AgenteRequisitos() {
             {/* Tab: Migrar Documentos */}
             {migrationMode && (
               <>
-                <h2 style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 22, color: C.textBright, marginBottom: 6 }}>Migrar Documentos Existentes</h2>
+                <h2 style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 800, fontSize: 22, color: C.textBright, marginBottom: 6 }}>Migrar Documentos Existentes</h2>
                 <p style={{ color: C.textDim, fontSize: 13, marginBottom: 24 }}>
                   Importe documentos de requisitos já elaborados — <span style={{ color: C.amber }}>UC · RF · RNF · RN · Diagramas</span>.
                   A IA lê e mapeia o conteúdo original para o schema, <strong style={{ color: C.amber }}>preservando cada texto, ID e critério sem alterações</strong>.
@@ -2783,7 +2785,7 @@ export default function AgenteRequisitos() {
                   onClick={() => document.getElementById("mig-inp").click()}
                   style={{ border: `1px dashed ${C.amber}50`, borderRadius: 12, padding: "40px 24px", textAlign: "center", cursor: "pointer", background: C.surface, transition: "all .2s", marginBottom: 16 }}>
                   <div style={{ fontSize: 32, marginBottom: 12, opacity: .5 }}>📦</div>
-                  <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 15, color: C.amber, marginBottom: 6 }}>Clique ou arraste os documentos</div>
+                  <div style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 800, fontSize: 15, color: C.amber, marginBottom: 6 }}>Clique ou arraste os documentos</div>
                   <div style={{ fontSize: 12, color: C.textDim }}>PDF · DOCX · DOC · TXT · MD — múltiplos arquivos</div>
                 </div>
                 <input id="mig-inp" type="file" accept=".pdf,.docx,.doc,.txt,.md" multiple style={{ display: "none" }}
@@ -2822,7 +2824,7 @@ export default function AgenteRequisitos() {
                 <div style={{ display: "flex", gap: 10 }}>
                   {migFiles.length > 0 && (
                     <button onClick={() => setMigFiles([])}
-                      style={{ background: "transparent", border: `1px solid ${C.muted}`, borderRadius: 7, color: C.textDim, fontSize: 13, padding: "11px 22px", cursor: "pointer", fontFamily: "'Syne',sans-serif", fontWeight: 700 }}>
+                      style={{ background: "transparent", border: `1px solid ${C.muted}`, borderRadius: 7, color: C.textDim, fontSize: 13, padding: "11px 22px", cursor: "pointer", fontFamily: "'Manrope',sans-serif", fontWeight: 700 }}>
                       Limpar lista
                     </button>
                   )}
@@ -2839,7 +2841,7 @@ export default function AgenteRequisitos() {
         {/* PHASE 1 — Chunks */}
         {phase === 1 && (
           <div className="fi">
-            <h2 style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 20, color: C.textBright, marginBottom: 4 }}>{file?.name}</h2>
+            <h2 style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 800, fontSize: 20, color: C.textBright, marginBottom: 4 }}>{file?.name}</h2>
             <p style={{ color: C.textDim, fontSize: 13, marginBottom: 20 }}>
               Dividido em <strong style={{ color: C.accent }}>{chunks.length} chunk(s)</strong>.
               Cada parte será analisada para extrair funcionalidades e agrupar em <strong style={{ color: C.purple }}>Épicos</strong>.
@@ -2872,7 +2874,7 @@ export default function AgenteRequisitos() {
         {/* PHASE 2 — Épicos */}
         {phase === 2 && (
           <div className="fi">
-            <h2 style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 20, color: C.textBright, marginBottom: 4 }}>
+            <h2 style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 800, fontSize: 20, color: C.textBright, marginBottom: 4 }}>
               {epicos.length} Épico(s) — {funcList.length} Funcionalidades
             </h2>
             <p style={{ color: C.textDim, fontSize: 13, marginBottom: 18 }}>
@@ -2889,8 +2891,8 @@ export default function AgenteRequisitos() {
                   <div key={i} style={{ border: `1px solid ${C.purple}18`, borderRadius: 8, marginBottom: 8, background: C.surface, overflow: "hidden" }}>
                     <div onClick={() => setExpanded(open ? null : `ep${i}`)} style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                       <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 3, background: C.purple + "18", color: C.purple, fontWeight: 600 }}>Épico</span>
-                      <span style={{ fontSize: 11, color: C.purple, fontFamily: "'Syne',sans-serif", fontWeight: 700 }}>{ep.id}</span>
-                      <span style={{ flex: 1, fontSize: 13, color: C.textBright, fontFamily: "'Syne',sans-serif", fontWeight: 600 }}>{ep.titulo}</span>
+                      <span style={{ fontSize: 11, color: C.purple, fontFamily: "'Manrope',sans-serif", fontWeight: 700 }}>{ep.id}</span>
+                      <span style={{ flex: 1, fontSize: 13, color: C.textBright, fontFamily: "'Manrope',sans-serif", fontWeight: 600 }}>{ep.titulo}</span>
                       <span style={{ fontSize: 10, color: C.textDim, marginRight: 6 }}>{funcsEp.length} func.</span>
                       {(ep.manterEntidades || []).length > 0 && <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 3, background: C.accent + "18", color: C.accent }}>Manter</span>}
                       <span style={{ color: C.purple, fontSize: 9 }}>{open ? "▲" : "▼"}</span>
@@ -2933,7 +2935,7 @@ export default function AgenteRequisitos() {
         {/* PHASE 3 — Features/UCs */}
         {phase === 3 && (
           <div className="fi">
-            <h2 style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 20, color: C.textBright, marginBottom: 4 }}>
+            <h2 style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 800, fontSize: 20, color: C.textBright, marginBottom: 4 }}>
               {ucs.length} Feature(s)/UC(s) Gerados
             </h2>
             <p style={{ color: C.textDim, fontSize: 13, marginBottom: 18 }}>
@@ -2968,7 +2970,7 @@ export default function AgenteRequisitos() {
         {/* PHASE 4 — Requisitos/HUs */}
         {phase === 4 && (
           <div className="fi">
-            <h2 style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 20, color: C.textBright, marginBottom: 4 }}>
+            <h2 style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 800, fontSize: 20, color: C.textBright, marginBottom: 4 }}>
               {hus.length} Requisito(s) Gerados
               {hus.some(h => h._fallback) && (
                 <span style={{ fontSize: 11, marginLeft: 10, color: C.amber, fontFamily: "inherit", fontWeight: 400 }}>
@@ -3015,7 +3017,7 @@ export default function AgenteRequisitos() {
         {/* PHASE 5 — Testes */}
         {phase === 5 && (
           <div className="fi">
-            <h2 style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 20, color: C.textBright, marginBottom: 4 }}>
+            <h2 style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 800, fontSize: 20, color: C.textBright, marginBottom: 4 }}>
               {cts.length} Caso(s) de Teste
             </h2>
             <p style={{ color: C.textDim, fontSize: 13, marginBottom: 18 }}>
@@ -3041,7 +3043,7 @@ export default function AgenteRequisitos() {
         {/* PHASE 6 — Review + DevOps */}
         {phase === 6 && (
           <div className="fi">
-            <h2 style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 20, color: C.textBright, marginBottom: 8 }}>
+            <h2 style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 800, fontSize: 20, color: C.textBright, marginBottom: 8 }}>
               Revisão e Envio ao Azure DevOps
             </h2>
             {/* Pipeline summary */}
@@ -3094,8 +3096,8 @@ export default function AgenteRequisitos() {
                   <div style={{ border: `1px solid ${C.purple}30`, borderRadius: 9, overflow: "hidden", marginBottom: 8, background: "#faf8ff" }}>
                     <div style={{ padding: "9px 14px", display: "flex", alignItems: "center", gap: 8 }}>
                       <span className="badge" style={{ background: C.purple + "18", color: C.purple }}>Epic</span>
-                      <span style={{ fontSize: 11, color: C.purple, fontFamily: "'Syne',sans-serif", fontWeight: 700 }}>{ep.id}</span>
-                      <span style={{ flex: 1, fontSize: 12, color: C.textBright, fontFamily: "'Syne',sans-serif", fontWeight: 600 }}>{ep.titulo}</span>
+                      <span style={{ fontSize: 11, color: C.purple, fontFamily: "'Manrope',sans-serif", fontWeight: 700 }}>{ep.id}</span>
+                      <span style={{ flex: 1, fontSize: 12, color: C.textBright, fontFamily: "'Manrope',sans-serif", fontWeight: 600 }}>{ep.titulo}</span>
                       <button
                         onClick={() => setExpanded(isEpOpen ? null : epPreviewKey)}
                         style={{ background: isEpOpen ? C.purple + "15" : "transparent", border: `1px solid ${C.purple}30`, borderRadius: 5, color: C.purple, fontSize: 10, padding: "3px 10px", cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
@@ -3125,7 +3127,7 @@ export default function AgenteRequisitos() {
                           <div style={{ border: `1px solid ${C.accent}30`, borderRadius: 8, overflow: "hidden", marginBottom: 6, background: "#f5f9ff" }}>
                             <div style={{ padding: "8px 13px", display: "flex", alignItems: "center", gap: 8 }}>
                               <span className="badge" style={{ background: C.accent + "15", color: C.accent }}>Feature</span>
-                              <span style={{ fontSize: 11, color: C.accent, fontFamily: "'Syne',sans-serif", fontWeight: 700 }}>{uc.ftId}</span>
+                              <span style={{ fontSize: 11, color: C.accent, fontFamily: "'Manrope',sans-serif", fontWeight: 700 }}>{uc.ftId}</span>
                               <span style={{ flex: 1, fontSize: 12, color: C.text }}>{uc.titulo}</span>
                               <span style={{ fontSize: 10, color: C.textDim, marginRight: 4 }}>{husUC.length} req.</span>
                               <button
@@ -3164,7 +3166,7 @@ export default function AgenteRequisitos() {
                                       <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                                           <span className="badge" style={{ background: C.green + "12", color: C.green, fontSize: 9 }}>Requirement</span>
-                                          <span style={{ fontSize: 11, color: C.green, fontFamily: "'Syne',sans-serif", fontWeight: 700 }}>{hu.reqId}</span>
+                                          <span style={{ fontSize: 11, color: C.green, fontFamily: "'Manrope',sans-serif", fontWeight: 700 }}>{hu.reqId}</span>
                                           {hu._fallback && <span className="badge" style={{ background: C.amber + "15", color: C.amber, fontSize: 9 }}>básica</span>}
                                           {hu._migrated && <span className="badge" style={{ background: C.amber + "15", color: C.amber, fontSize: 9 }}>migrado</span>}
                                         </div>
@@ -3212,7 +3214,7 @@ export default function AgenteRequisitos() {
                   <div style={{ border: `1px solid ${C.amber}30`, borderRadius: 9, overflow: "hidden", marginBottom: 8, background: "#fffdf5" }}>
                     <div style={{ padding: "9px 14px", display: "flex", alignItems: "center", gap: 8 }}>
                       <span className="badge" style={{ background: C.amber + "18", color: C.amber }}>⚠</span>
-                      <span style={{ flex: 1, fontSize: 12, color: C.amber, fontFamily: "'Syne',sans-serif", fontWeight: 600 }}>
+                      <span style={{ flex: 1, fontSize: 12, color: C.amber, fontFamily: "'Manrope',sans-serif", fontWeight: 600 }}>
                         Features sem épico — épico original não encontrado ({orphanUCs.length} feature{orphanUCs.length > 1 ? "s" : ""})
                       </span>
                     </div>
@@ -3228,7 +3230,7 @@ export default function AgenteRequisitos() {
                           <div style={{ border: `1px solid ${C.accent}30`, borderRadius: 8, overflow: "hidden", marginBottom: 6, background: "#f5f9ff" }}>
                             <div style={{ padding: "8px 13px", display: "flex", alignItems: "center", gap: 8 }}>
                               <span className="badge" style={{ background: C.accent + "15", color: C.accent }}>Feature</span>
-                              <span style={{ fontSize: 11, color: C.accent, fontFamily: "'Syne',sans-serif", fontWeight: 700 }}>{uc.ftId}</span>
+                              <span style={{ fontSize: 11, color: C.accent, fontFamily: "'Manrope',sans-serif", fontWeight: 700 }}>{uc.ftId}</span>
                               <span style={{ flex: 1, fontSize: 12, color: C.text }}>{uc.titulo}</span>
                               <span style={{ fontSize: 10, color: C.textDim, marginRight: 4 }}>{husUC.length} req.</span>
                               <button
@@ -3264,7 +3266,7 @@ export default function AgenteRequisitos() {
                                       <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                                           <span className="badge" style={{ background: C.green + "12", color: C.green, fontSize: 9 }}>Requirement</span>
-                                          <span style={{ fontSize: 11, color: C.green, fontFamily: "'Syne',sans-serif", fontWeight: 700 }}>{hu.reqId}</span>
+                                          <span style={{ fontSize: 11, color: C.green, fontFamily: "'Manrope',sans-serif", fontWeight: 700 }}>{hu.reqId}</span>
                                         </div>
                                         <div style={{ fontSize: 11, color: C.textDim, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{wi.titulo}</div>
                                       </div>
@@ -3348,13 +3350,13 @@ export default function AgenteRequisitos() {
                     <label style={{ display: "block", fontSize: 11, color: C.textDim, marginBottom: 6 }}>Tipo / Produto</label>
                     <div style={{ display: "flex", gap: 2, background: C.surface, borderRadius: 8, padding: 3, border: `1px solid ${C.border}`, marginBottom: isCOR ? 0 : 8 }}>
                       <button onClick={() => setIsCOR(true)}
-                        style={{ flex: 1, padding: "7px 0", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 11,
+                        style={{ flex: 1, padding: "7px 0", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "'Manrope',sans-serif", fontWeight: 700, fontSize: 11,
                           background: isCOR ? "#070d10" : "transparent", color: isCOR ? C.green : C.textDim,
                           boxShadow: isCOR ? `inset 0 0 0 1px ${C.green}30` : "none", transition: "all .15s" }}>
                         COR — Global
                       </button>
                       <button onClick={() => setIsCOR(false)}
-                        style={{ flex: 1, padding: "7px 0", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 11,
+                        style={{ flex: 1, padding: "7px 0", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "'Manrope',sans-serif", fontWeight: 700, fontSize: 11,
                           background: !isCOR ? "#0e1420" : "transparent", color: !isCOR ? C.accent : C.textDim,
                           boxShadow: !isCOR ? `inset 0 0 0 1px ${C.accent}30` : "none", transition: "all .15s" }}>
                         Produto / Funcionalidade
@@ -3439,7 +3441,7 @@ export default function AgenteRequisitos() {
           <div className="fi" style={{ paddingTop: 28 }}>
             <div style={{ textAlign: "center", marginBottom: 28 }}>
               <div style={{ width: 56, height: 56, borderRadius: "50%", background: C.green + "15", border: `2px solid ${C.green}40`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", fontSize: 22, color: C.green }}>✓</div>
-              <h2 style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 24, color: C.textBright, marginBottom: 6 }}>Publicado com sucesso!</h2>
+              <h2 style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 800, fontSize: 24, color: C.textBright, marginBottom: 6 }}>Publicado com sucesso!</h2>
               <p style={{ color: C.textDim, fontSize: 13 }}>
                 {devLog.length > 0 && (() => {
                 const ok = devLog.filter(l => l.ok); const err = devLog.filter(l => !l.ok);
@@ -3500,12 +3502,12 @@ export default function AgenteRequisitos() {
       {manualOpen && (
         <div onClick={e => e.target === e.currentTarget && setManualOpen(false)}
           style={{ position: "fixed", inset: 0, background: "rgba(10,14,26,0.55)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", overflowY: "auto" }}>
-          <div style={{ background: "#ffffff", borderRadius: 12, border: `1px solid ${C.border}`, width: "100%", maxWidth: 800, fontFamily: "'IBM Plex Mono','Courier New',monospace", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>
+          <div style={{ background: "#ffffff", borderRadius: 12, border: `1px solid ${C.border}`, width: "100%", maxWidth: 800, fontFamily: "'Roboto','system-ui',sans-serif", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>
 
             {/* Header */}
             <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 12, background: "#f0fdf4", borderRadius: "12px 12px 0 0" }}>
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.green }} />
-              <span style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 16, color: C.textBright, flex: 1 }}>☰ Manual do Usuário</span>
+              <span style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 800, fontSize: 16, color: C.textBright, flex: 1 }}>☰ Manual do Usuário</span>
               <span style={{ fontSize: 11, color: C.muted, marginRight: 8 }}>Guia completo · passo a passo</span>
               <button onClick={() => setManualOpen(false)}
                 style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, color: C.textDim, fontSize: 13, padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}>
@@ -3518,7 +3520,7 @@ export default function AgenteRequisitos() {
 
               {/* Visão geral */}
               <div style={{ marginBottom: 24, padding: "14px 18px", background: "#f0fdf4", border: `1px solid ${C.green}30`, borderRadius: 10 }}>
-                <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 13, color: C.green, marginBottom: 8 }}>O que é este app?</div>
+                <div style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 800, fontSize: 13, color: C.green, marginBottom: 8 }}>O que é este app?</div>
                 <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.8 }}>
                   O <strong>Agente de Requisitos</strong> transforma documentos de texto (atas, levantamentos, especificações) em artefatos estruturados de engenharia de software — Épicos, Features/UCs, Requisitos/HUs e Casos de Teste — prontos para serem publicados no <strong>Azure DevOps</strong> e na <strong>Wiki</strong>.
                 </div>
@@ -3752,12 +3754,12 @@ export default function AgenteRequisitos() {
       {faqOpen && (
         <div onClick={e => e.target === e.currentTarget && setFaqOpen(false)}
           style={{ position: "fixed", inset: 0, background: "rgba(10,14,26,0.55)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", overflowY: "auto" }}>
-          <div style={{ background: "#ffffff", borderRadius: 12, border: `1px solid ${C.border}`, width: "100%", maxWidth: 760, fontFamily: "'IBM Plex Mono','Courier New',monospace", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>
+          <div style={{ background: "#ffffff", borderRadius: 12, border: `1px solid ${C.border}`, width: "100%", maxWidth: 760, fontFamily: "'Roboto','system-ui',sans-serif", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>
 
             {/* Modal header */}
             <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 12, background: "#f8fafc", borderRadius: "12px 12px 0 0" }}>
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.accent }} />
-              <span style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 16, color: C.textBright, flex: 1 }}>FAQ — Por que trabalhamos assim?</span>
+              <span style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 800, fontSize: 16, color: C.textBright, flex: 1 }}>FAQ — Por que trabalhamos assim?</span>
               <button onClick={() => setFaqOpen(false)}
                 style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, color: C.textDim, fontSize: 13, padding: "4px 12px", cursor: "pointer", fontFamily: "inherit" }}>
                 ✕ fechar
@@ -3773,7 +3775,7 @@ export default function AgenteRequisitos() {
 
               {/* ── Seção 1 ── */}
               <div style={{ marginBottom: 28 }}>
-                <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 14, color: C.accent, marginBottom: 16, paddingBottom: 8, borderBottom: `2px solid ${C.accent}20` }}>
+                <div style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 800, fontSize: 14, color: C.accent, marginBottom: 16, paddingBottom: 8, borderBottom: `2px solid ${C.accent}20` }}>
                   Seção 1 — Para a Operação e Gestão
                 </div>
 
@@ -3827,7 +3829,7 @@ export default function AgenteRequisitos() {
 
               {/* ── Seção 2 ── */}
               <div style={{ marginBottom: 28 }}>
-                <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 14, color: C.purple, marginBottom: 16, paddingBottom: 8, borderBottom: `2px solid ${C.purple}20` }}>
+                <div style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 800, fontSize: 14, color: C.purple, marginBottom: 16, paddingBottom: 8, borderBottom: `2px solid ${C.purple}20` }}>
                   Seção 2 — Para Analistas e Auditores
                 </div>
 
@@ -3908,7 +3910,7 @@ export default function AgenteRequisitos() {
 
                 {/* Plano de melhoria */}
                 <div style={{ background: "#f8f4ff", border: `1px solid ${C.purple}25`, borderRadius: 8, padding: "14px 16px", marginTop: 8 }}>
-                  <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 12, color: C.purple, marginBottom: 10 }}>Plano de Melhoria de Conformidade</div>
+                  <div style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 700, fontSize: 12, color: C.purple, marginBottom: 10 }}>Plano de Melhoria de Conformidade</div>
                   {[
                     "Registrar origemDocumento (arquivo, versão, seção) em cada artefato gerado",
                     "Gerar matriz de rastreabilidade bidirecional como artefato de saída",
@@ -4352,7 +4354,7 @@ function FAQ_Q({ n, q, children, accent = "#0369a1" }) {
     <div style={{ marginBottom: 14, border: "1px solid #e8ecf5", borderRadius: 8, overflow: "hidden" }}>
       <div onClick={() => setOpen(o => !o)}
         style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", cursor: "pointer", background: open ? accent + "06" : "#fafbfd" }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: accent, fontFamily: "'Syne',sans-serif", flexShrink: 0 }}>{n}</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: accent, fontFamily: "'Manrope',sans-serif", flexShrink: 0 }}>{n}</span>
         <span style={{ fontSize: 12, fontWeight: 700, color: "#334155", flex: 1 }}>{q}</span>
         <span style={{ fontSize: 9, color: "#94a3b8" }}>{open ? "▲" : "▼"}</span>
       </div>
@@ -4392,7 +4394,7 @@ function CorrectionPanel({ value, onChange, onRegenerate, loading, label }) {
       <button
         onClick={onRegenerate}
         disabled={loading || !value.trim()}
-        style={{ marginTop: 8, cursor: value.trim() && !loading ? "pointer" : "not-allowed", opacity: value.trim() && !loading ? 1 : 0.35, background: value.trim() ? "#100b00" : "transparent", border: `1px solid ${C_amber}60`, color: C_amber, borderRadius: 7, fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 12, padding: "8px 18px", transition: "all .15s", display: "inline-flex", alignItems: "center", gap: 6 }}
+        style={{ marginTop: 8, cursor: value.trim() && !loading ? "pointer" : "not-allowed", opacity: value.trim() && !loading ? 1 : 0.35, background: value.trim() ? "#100b00" : "transparent", border: `1px solid ${C_amber}60`, color: C_amber, borderRadius: 7, fontFamily: "'Manrope',sans-serif", fontWeight: 700, fontSize: 12, padding: "8px 18px", transition: "all .15s", display: "inline-flex", alignItems: "center", gap: 6 }}
       >
         <span>↺</span> {loading ? "Regerando..." : "Regerar com esta correção"}
       </button>
