@@ -258,8 +258,10 @@ REGRAS OBRIGATÓRIAS:
    - "origemPasso" em FA e FE: código do passo do fluxo principal que DISPARA o fluxo (ex: "FP-2").
    - "descricao" em FA: frase curta explicando o gatilho — "Este fluxo alternativo se inicia quando o ator [ação] no passo FP-X do fluxo principal."
    - "descricao" em FE: frase curta explicando o gatilho — "Este fluxo de exceção ocorre quando [condição] no passo FP-X do fluxo principal."
+CAMPOS ADICIONAIS OBRIGATÓRIOS:
+- "gatilho": evento ou ação do ator que inicia o UC (ex: "Usuário aciona opção Processar"). DIFERENTE de pré-condição — é o evento disparador, não um estado. NUNCA deixe vazio.
 Retorne SOMENTE JSON (sem markdown):
-{"ucs":[{"ftId":"FT001","ucId":"UC001","titulo":"string","atores":["string"],"precondição":"string","fluxoPrincipal":[{"passo":"1","descricao":"string","refs":["RN001","RN002"]},{"passo":"2","descricao":"string","refs":[]}],"fluxosAlternativos":[{"id":"FA1","titulo":"string","origemPasso":"FP-2","descricao":"Este fluxo alternativo se inicia quando o ator aciona X no passo FP-2 do fluxo principal.","passos":["string"]}],"fluxosExcecao":[{"id":"FE1","origemPasso":"FP-2","descricao":"Este fluxo de exceção ocorre quando Y no passo FP-2 do fluxo principal.","mensagem":"string","retorno":"string"}],"posCondição":"string"}]}`;
+{"ucs":[{"ftId":"FT001","ucId":"UC001","titulo":"string","atores":["string"],"precondição":"string","gatilho":"evento que dispara o UC","fluxoPrincipal":[{"passo":"1","descricao":"string","refs":["RN001","RN002"]},{"passo":"2","descricao":"string","refs":[]}],"fluxosAlternativos":[{"id":"FA1","titulo":"string","origemPasso":"FP-2","descricao":"Este fluxo alternativo se inicia quando o ator aciona X no passo FP-2 do fluxo principal.","passos":["string"]}],"fluxosExcecao":[{"id":"FE1","origemPasso":"FP-2","descricao":"Este fluxo de exceção ocorre quando Y no passo FP-2 do fluxo principal.","mensagem":"string","retorno":"string"}],"posCondição":"string"}]}`;
   const corrNote = correction ? `\n\n⚠ CORREÇÃO SOLICITADA PELO ANALISTA: ${correction}` : "";
   const raw = await claude(
     `Épico: ${epico.id} — ${epico.titulo}\nObjetivo: ${epico.objetivo || ""}\nEntidades com padrão Manter: ${(epico.manterEntidades || []).join(", ") || "nenhuma"}\n\nFuncionalidades:\n${JSON.stringify(funcsDoEpico, null, 2)}\n\nGere todos os Casos de Uso.${corrNote}`,
@@ -296,7 +298,6 @@ function createFallbackHU(uc, idx) {
     como:  "Usuário do sistema",
     quero: uc.titulo,
     para:  "realizar a funcionalidade prevista no caso de uso",
-    apf:   { tipo: "Perfectiva", be: ["Consulta"], fe: ["Consulta"], dados: ["Internos"], arquivos: ["NA"] },
     regrasNegocio:      [],
     criteriosAceitacao: [{ id: "Critério 01", descricao: "A funcionalidade deve estar disponível conforme especificado no caso de uso." }],
     _fallback: true,
@@ -313,17 +314,18 @@ async function fase3_gerarHUsParaUC(uc, huStartIdx, correction = "", rnPrefix = 
   const rn1 = `RN-${rnPrefix}-001`;
   const system = `Você é um Analista de Requisitos ágil. Gere TODAS as Histórias de Usuário para este Caso de Uso.
 REGRAS OBRIGATÓRIAS:
-1. Mínimo 1 HU obrigatória. UCs "Manter" geram pelo menos 2 HUs (Consultar + Manter dados).
+1. QUANTIDADE DE HUs POR UC — REGRA INVEST:
+   - UC "Manter" (CRUD com FP=Incluir, FA=Alterar/Excluir/Consultar): gere 1 HU por operação CRUD presente — tipicamente 4 HUs: "Incluir [Entidade]", "Alterar [Entidade]", "Excluir [Entidade]", "Consultar [Entidade]". Cada operação é independente, estimável e testável (princípio INVEST).
+   - UC simples (1 ator, 1 objetivo claro): EXATAMENTE 1 HU.
+   - UC com subprocessos distintos envolvendo atores diferentes: máx 3 HUs, cada uma com objetivo de negócio distinto.
+   - Fluxos de exceção NUNCA geram HU separada — tornam-se critérios de aceitação da HU correspondente (ex: exceção de saldo insuficiente → critério de aceitação da HU "Incluir Pagamento").
 2. "como": OBRIGATÓRIO — persona específica com perfil (ex: "Usuário com perfil Administrador"). NUNCA deixe vazio.
 3. "quero": OBRIGATÓRIO — ação clara em verbo no infinitivo. Exemplos: "consultar o saldo da conta", "registrar novo pagamento recorrente". NUNCA deixe vazio.
 3b. "workItem.titulo": OBRIGATÓRIO — deve iniciar com verbo no infinitivo. Ex: "Consultar Saldo da Conta", "Registrar Pagamento Recorrente". NUNCA use substantivos como título: ERRADO "Consulta de Saldo", "Registro de Pagamento".
-4. APF tipo: "Perfectiva", "Corretiva" ou "Adaptativa".
-5. APF be/fe: subconjunto de ["Inclusão","Alteração","Exclusão","Consulta","NA"].
-6. APF dados: subconjunto de ["Internos","Externos","NA"]. APF arquivos: subconjunto de ["Download","Upload","Impressão","NA"].
-7. Regras de negócio: IDs no padrão "${rn1}", sequencial. "nome": substantivo curto (máx 5 palavras). "descricao": frase completa. "origemPasso": passo FP onde a regra se aplica (ex: "FP-2").
-8. Critérios: id "Critério 01", "Critério 02"...
+4. Regras de negócio: IDs no padrão "${rn1}", sequencial. "nome": substantivo curto (máx 5 palavras). "descricao": frase completa. "origemPasso": passo FP onde a regra se aplica (ex: "FP-2").
+5. Critérios: id "Critério 01", "Critério 02"...
 Retorne SOMENTE JSON sem markdown:
-{"hus":[{"reqId":"REQ001","titulo":"string","como":"Usuário com perfil X","quero":"realizar ação Y","para":"obter benefício Z","apf":{"tipo":"Perfectiva","be":["Inclusão"],"fe":["Consulta"],"dados":["Internos"],"arquivos":["NA"]},"regrasNegocio":[{"id":"${rn1}","nome":"Nome Curto","descricao":"Descrição da regra","origemPasso":"FP-2"}],"criteriosAceitacao":[{"id":"Critério 01","descricao":"string"}],"workItem":{"titulo":"string","descricao":"string","criteriosAceitacao":"string","tags":["string"]}}]}`;
+{"hus":[{"reqId":"REQ001","titulo":"string","como":"Usuário com perfil X","quero":"realizar ação Y","para":"obter benefício Z","regrasNegocio":[{"id":"${rn1}","nome":"Nome Curto","descricao":"Descrição da regra","origemPasso":"FP-2"}],"criteriosAceitacao":[{"id":"Critério 01","descricao":"string"}],"workItem":{"titulo":"string","descricao":"string","criteriosAceitacao":"string","tags":["string"]}}]}`;
   const corrNote = correction ? `\n\n⚠ CORREÇÃO SOLICITADA PELO ANALISTA: ${correction}` : "";
   // Envia apenas os campos relevantes para geração de HUs.
   // Passos renumerados a partir de 1 independente do valor original (evita confusão com passos 43, 44...).
@@ -417,16 +419,19 @@ async function enrichRFRNF(hus, ucs) {
     const prefix = ucToRNPrefix(uc.titulo);
     const system = `Você é um Analista de Requisitos. Com base no Caso de Uso e HUs abaixo, extraia:
 1. REQUISITOS FUNCIONAIS (RF): comportamentos específicos que o sistema deve implementar, derivados dos critérios de aceite e regras de negócio. IDs: "RF-${prefix}-001", "RF-${prefix}-002"...
-2. REQUISITOS NÃO FUNCIONAIS (RNF): restrições de qualidade (Performance, Segurança, Disponibilidade, Usabilidade, Escalabilidade). IDs: "RNF-${prefix}-001"...
+2. REQUISITOS NÃO FUNCIONAIS (RNF): restrições de qualidade conforme ISO/IEC 25010. IDs: "RNF-${prefix}-001"...
 REGRAS:
 - Máx 5 RF e 4 RNF por UC. Se não houver conteúdo suficiente, retorne arrays vazios [].
 - descricao RF: sentença declarativa modal — "O sistema deve [verbo] [complemento]." Ex: "O sistema deve validar o saldo disponível antes de autorizar a transação.", "O sistema deve registrar log de auditoria para cada operação realizada." ERRADO: iniciar com verbo no infinitivo sem sujeito.
 - origemPasso: passo do FP relacionado (ex: "FP-2"). Use "" se não aplicável.
-- categoria RNF: uma de "Performance" | "Segurança" | "Disponibilidade" | "Usabilidade" | "Escalabilidade".
+- prioridade RF: "Alta" se requisito é crítico para funcionamento do UC principal, "Média" se é importante mas não bloqueante, "Baixa" se é complementar.
+- verificacao RF: como confirmar que o requisito foi atendido — referencie o CT ou critério (ex: "Verificado por CT-FT001-02" ou "Confirmado via teste de integração da API de autorização").
+- categoria RNF: uma de "Performance Efficiency" | "Security" | "Reliability" | "Usability" | "Compatibility" | "Maintainability" | "Portability" | "Functional Suitability" — conforme ISO/IEC 25010:2011.
 - descricao RNF: sentença declarativa modal — "O sistema deve [verbo] [complemento]." Ex: "O sistema deve processar a requisição em até 500ms sob carga de 200 usuários simultâneos."
 - metrica RNF: valor mensurável quando disponível (ex: "<= 500ms"), caso contrário "A definir".
+- prioridade RNF: "Alta" se requisito é crítico para funcionamento do UC principal, "Média" se é importante mas não bloqueante, "Baixa" se é complementar.
 Retorne SOMENTE JSON sem markdown:
-{"rf":[{"id":"RF-${prefix}-001","descricao":"string","origemPasso":"FP-2"}],"rnf":[{"id":"RNF-${prefix}-001","categoria":"Performance","descricao":"string","metrica":"string"}]}`;
+{"rf":[{"id":"RF-${prefix}-001","descricao":"string","origemPasso":"FP-2","prioridade":"Alta","verificacao":"string"}],"rnf":[{"id":"RNF-${prefix}-001","categoria":"Performance Efficiency","descricao":"string","metrica":"string","prioridade":"Alta"}]}`;
 
     try {
       const ucCompact = {
@@ -484,10 +489,10 @@ REGRAS CRÍTICAS — PRESERVAÇÃO DE CONTEÚDO:
 12. PROIBIDO incluir em regrasNegocio: atributos de tabelas/entidades (campos de banco de dados como DataInicio, StatusExecucao, TotalBoletos, Quantidade, Valor etc.) — esses são dicionário de dados, NÃO regras de negócio.
 13. PADRÃO MANTER (CRUD): se o documento trata de operações CRUD (Incluir/Alterar/Excluir/Consultar) sobre a MESMA entidade → consolide em UM ÚNICO UC com título "Manter [Entidade]". Fluxo principal = Consultar. FA1=Incluir, FA2=Alterar, FA3=Excluir. NÃO crie UCs separados para cada operação CRUD da mesma entidade.
 14. NUMERAÇÃO DE PASSOS: os passos do fluxo principal podem estar numerados de forma não sequencial a partir de 1 (ex: 43, 44, 45 ou 3.1, 3.2). SEMPRE renumere a partir de "1" no output — passo 43 → "1", passo 44 → "2" etc. O número original pode ser ignorado; o que importa é a ordem relativa dentro do fluxo.
-15. TABELAS DE CABEÇALHO DO UC: documentos frequentemente descrevem atributos do UC em tabela (linhas como "Identificador | UC-07", "Ator Principal | Operador", "Pré-condições | texto", "Pós-condições | texto", "Gatilho | texto"). Mapeie cada célula ao campo correto do schema: Identificador→ucId, Ator Principal→atores[], Pré-condições→precondição, Pós-condições→posCondição, Gatilho→precondição (append). NÃO trate essas linhas como passos do fluxo.
+15. TABELAS DE CABEÇALHO DO UC: documentos frequentemente descrevem atributos do UC em tabela (linhas como "Identificador | UC-07", "Ator Principal | Operador", "Pré-condições | texto", "Pós-condições | texto", "Gatilho | texto"). Mapeie cada célula ao campo correto do schema: Identificador→ucId, Ator Principal→atores[], Pré-condições→precondição, Pós-condições→posCondição, Gatilho→campo "gatilho" (NÃO append a precondição). NÃO trate essas linhas como passos do fluxo.
 
 Retorne SOMENTE JSON sem markdown:
-{"epico":{"id":"${epId}","titulo":"nome do módulo/domínio identificado","objetivo":"objetivo extraído","funcIds":[],"manterEntidades":[]},"ucs":[{"ftId":"FT${pad3(ucStartIdx + 1)}","ucId":"UC${pad3(ucStartIdx + 1)}","titulo":"título original","atores":["ator original"],"precondição":"texto original","fluxoPrincipal":[{"passo":"1","descricao":"texto original","refs":["RN-PREF-001"]}],"fluxosAlternativos":[{"id":"FA1","titulo":"título original","origemPasso":"FP-2","descricao":"Este fluxo alternativo se inicia quando...","passos":["texto original"]}],"fluxosExcecao":[{"id":"FE1","origemPasso":"FP-2","descricao":"Este fluxo de exceção ocorre quando...","mensagem":"mensagem original","retorno":"retorno original"}],"posCondição":"texto original","epicId":"${epId}","epicTitulo":"","_migrated":true}],"hus":[{"reqId":"REQ${pad3(huStartIdx + 1)}","titulo":"título original","como":"persona/ator ou 'Usuário do sistema'","quero":"ação original","para":"benefício original","ucId":"","ftId":"","epicId":"${epId}","apf":{"tipo":"Perfectiva","be":["Consulta"],"fe":["Consulta"],"dados":["Internos"],"arquivos":["NA"]},"regrasNegocio":[{"id":"RN-PREF-001","nome":"nome da regra","descricao":"texto original","origemPasso":"FP-2"}],"criteriosAceitacao":[{"id":"Critério 01","descricao":"texto original"}],"workItem":{"titulo":"","descricao":"","criteriosAceitacao":"","tags":["Migrado"]},"_migrated":true}]}`;
+{"epico":{"id":"${epId}","titulo":"nome do módulo/domínio identificado","objetivo":"objetivo extraído","funcIds":[],"manterEntidades":[]},"ucs":[{"ftId":"FT${pad3(ucStartIdx + 1)}","ucId":"UC${pad3(ucStartIdx + 1)}","titulo":"título original","atores":["ator original"],"precondição":"texto original","gatilho":"evento ou ação do ator que inicia o UC","fluxoPrincipal":[{"passo":"1","descricao":"texto original","refs":["RN-PREF-001"]}],"fluxosAlternativos":[{"id":"FA1","titulo":"título original","origemPasso":"FP-2","descricao":"Este fluxo alternativo se inicia quando...","passos":["texto original"]}],"fluxosExcecao":[{"id":"FE1","origemPasso":"FP-2","descricao":"Este fluxo de exceção ocorre quando...","mensagem":"mensagem original","retorno":"retorno original"}],"posCondição":"texto original","epicId":"${epId}","epicTitulo":"","_migrated":true}],"hus":[{"reqId":"REQ${pad3(huStartIdx + 1)}","titulo":"título original","como":"persona/ator ou 'Usuário do sistema'","quero":"ação original","para":"benefício original","ucId":"","ftId":"","epicId":"${epId}","regrasNegocio":[{"id":"RN-PREF-001","nome":"nome da regra","descricao":"texto original","origemPasso":"FP-2"}],"criteriosAceitacao":[{"id":"Critério 01","descricao":"texto original"}],"workItem":{"titulo":"","descricao":"","criteriosAceitacao":"","tags":["Migrado"]},"_migrated":true}]}`;
 }
 
 async function migrarDocumentoChunk(filename, content, epIdx, ucStartIdx, huStartIdx) {
@@ -585,17 +590,21 @@ async function migrarDocumento(filename, content, epIdx, ucStartIdx, huStartIdx,
 // FASE 4 — Gerar CTs para um UC
 // ════════════════════════════════════════════════════════════════════
 
-async function fase4_gerarCTs(uc, husDoUC, correction = "") {
+async function fase4_gerarCTs(uc, husDoUC, correction = "", rnfsDoUC = []) {
   const firstReqId = husDoUC[0]?.reqId || "";
+  const rnfsComMetrica = rnfsDoUC.filter(r => r.metrica && r.metrica !== "A definir");
+  const rnfInstr = rnfsComMetrica.length
+    ? `\n6. Para cada RNF com metrica definida, gere 1 CT adicional de tipo 'Nao Funcional' com 'dado'=cenário de carga/contexto, 'quando'=ação que estresse o requisito, 'entao'=métrica esperada. Vincule ao reqId da HU mais relacionada.\nRNFs com métrica: ${JSON.stringify(rnfsComMetrica.map(r => ({ id: r.id, categoria: r.categoria, metrica: r.metrica })))}`
+    : "";
   const system = `Você é um QA especialista em BDD. Gere Casos de Teste para este UC/Feature.
 REGRAS OBRIGATÓRIAS:
 1. Mínimo 1 CT por HU/Requirement — cada HU DEVE ter ao menos um CT com "reqId" igual ao seu "reqId".
 2. CTs extras para fluxos alternativos e de exceção → vincule ao "reqId" da HU mais relevante.
 3. Identificador: CT-${uc.ftId}-[nn] sequencial (01, 02...).
 4. "reqId": OBRIGATÓRIO — ID da HU que este CT valida (ex: "${firstReqId}").
-5. "fluxo": "Principal", "FA1", "FA2", "FE1" etc. conforme o fluxo coberto.
+5. "fluxo": "Principal", "FA1", "FA2", "FE1" etc. conforme o fluxo coberto.${rnfInstr}
 Retorne SOMENTE JSON:
-{"cts":[{"identificador":"CT-${uc.ftId}-01","reqId":"${firstReqId}","fluxo":"Principal","tipo":"Funcional","dado":"contexto/estado inicial","e":"pré-condição","quando":"ação realizada","entao":"resultado esperado"}]}`;
+{"cts":[{"identificador":"CT-${uc.ftId}-01","reqId":"${firstReqId}","fluxo":"Principal","tipo":"Funcional","dado":"contexto/estado inicial","e":"pré-condição","quando":"ação realizada","entao":"resultado esperado"},{"identificador":"CT-${uc.ftId}-NF01","reqId":"${firstReqId}","fluxo":"RNF","tipo":"Nao Funcional","dado":"contexto","e":"pre-condicao","quando":"acao","entao":"metrica esperada"}]}`;
   const corrNote = correction ? `\n\n⚠ CORREÇÃO SOLICITADA PELO ANALISTA: ${correction}` : "";
   const raw = await claude(
     `UC:\n${JSON.stringify(uc, null, 2)}\nHUs (Requirements):\n${JSON.stringify(husDoUC, null, 2)}\n\nGere CTs — mínimo 1 por HU.${corrNote}`,
@@ -707,11 +716,11 @@ function utf8ToB64(str) {
 
 // YAML header — criado_em vazio: pipeline preenche via git log
 function wikiYaml(titulo, modulo, tipo) {
-  return `---\ntitle: "${titulo}"\nmodulo: "${modulo}"\ntipo: "${tipo}"\ndoc_version: "1.0.0"\nstatus: "em-elaboracao"\ncriado_em: ""\nlast_modified: ""\nlast_author: ""\nlast_commit: ""\n---\n\n`;
+  return `---\ntitle: "${titulo}"\nmodulo: "${modulo}"\ntipo: "${tipo}"\ndoc_version: "1.0.0"\n# Ciclo: proposto → aprovado → implementado → verificado → satisfeito → obsoleto\nstatus: "proposto"\ncriado_em: ""\nlast_modified: ""\nlast_author: ""\nlast_commit: ""\n---\n\n`;
 }
 
 function wikiHistorico() {
-  return `\n---\n\n## Historico de Alteracoes\n\n<!-- HISTORICO:START -->\n| Versao | Data | Autor | Commit | Mensagem |\n|--------|------|-------|--------|----------|\n| - | - | - | - | _Aguardando primeiro commit_ |\n<!-- HISTORICO:END -->\n`;
+  return `\n---\n\n## Historico de Alteracoes\n\n<!-- HISTORICO:START -->\n| Versao | Data | Autor | Commit | Mensagem | Aprovado Por |\n|--------|------|-------|--------|----------|--------------|\n| - | - | - | - | _Aguardando primeiro commit_ | - |\n<!-- HISTORICO:END -->\n`;
 }
 
 // ── Índice do módulo ─────────────────────────────────────────────
@@ -736,7 +745,7 @@ function wikiUCIndex(ep, ucsEp, modulo) {
   md += `| ID | Nome | Status |\n|----|------|--------|\n`;
   ucsEp.forEach(uc => {
     const slug = `${uc.ftId}-${toSlug(uc.titulo)}`;
-    md += `| ${uc.ftId} | [${uc.titulo}](${slug}) | Em elaboracao |\n`;
+    md += `| ${uc.ftId} | [${uc.titulo}](${slug}) | Proposto |\n`;
   });
   md += `\n> Siga os padroes em [Padroes e Convencoes](../../COR/Padroes-e-Convencoes)\n`;
   return md + wikiHistorico();
@@ -846,15 +855,18 @@ function wikiUCFile(uc, husDoUC, ep, modulo) {
   atores.forEach((a, i) => { md += `| ${a} | ${i === 0 ? "Principal" : "Secundario"} | - |\n`; });
   md += `| Sistema | Secundario | - |\n\n`;
 
-  // 3. Pré-condições
-  md += `## 3. Pre-condicoes\n\n`;
+  // 3. Gatilho
+  md += `## 3. Gatilho\n\n> ${uc.gatilho || "_A definir — evento ou ação que inicia este caso de uso._"}\n\n`;
+
+  // 4. Pré-condições
+  md += `## 4. Pre-condicoes\n\n`;
   const preConds = (uc.precondição || "").split(/[.;]/).map(s => s.trim()).filter(Boolean);
   if (preConds.length) preConds.forEach(c => { md += `- [ ] ${c}.\n`; });
   else md += `- [ ] O usuario deve estar autenticado.\n`;
   md += "\n";
 
-  // 4. Pós-condições
-  md += `## 4. Pos-condicoes\n\n`;
+  // 5. Pós-condições
+  md += `## 5. Pos-condicoes\n\n`;
   const posConds = (uc.posCondição || "").split(/[.;]/).map(s => s.trim()).filter(Boolean);
   if (posConds.length) posConds.forEach(c => { md += `- [ ] ${c}.\n`; });
   else md += `- [ ] ...\n`;
@@ -873,8 +885,8 @@ function wikiUCFile(uc, husDoUC, ep, modulo) {
     });
   });
 
-  // 5. Fluxo Principal — âncoras + coluna Referências
-  md += `## 5. Fluxo Principal\n\n| Passo | Ator | Acao | Referencias |\n|-------|------|------|-------------|\n`;
+  // 6. Fluxo Principal — âncoras + coluna Referências
+  md += `## 6. Fluxo Principal\n\n| Passo | Ator | Acao | Referencias |\n|-------|------|------|-------------|\n`;
   (uc.fluxoPrincipal || []).forEach(p => {
     const passoNorm = normalizePasso(p.passo) || `FP-${p.passo}`;
     const passoNum  = passoNorm.replace("FP-", "");
@@ -890,8 +902,8 @@ function wikiUCFile(uc, husDoUC, ep, modulo) {
   });
   md += "\n";
 
-  // 6. Fluxos Alternativos
-  md += `## 6. Fluxos Alternativos\n\n`;
+  // 7. Fluxos Alternativos
+  md += `## 7. Fluxos Alternativos\n\n`;
   if ((uc.fluxosAlternativos || []).length) {
     uc.fluxosAlternativos.forEach(a => {
       const anchorId  = a.id.toLowerCase();
@@ -923,8 +935,8 @@ function wikiUCFile(uc, husDoUC, ep, modulo) {
     md += `### FA01 - Fluxo Alternativo\n\n> _Descreva quando este fluxo é acionado._\n\n**Ponto de extensão:** [FP-X](#fp-x)\n\n| Passo | Ator | Acao |\n|-------|------|------|\n| 1 | ... | ... |\n| 2 | Sistema | Retorna ao [FP-X](#fp-x) do fluxo principal. |\n\n`;
   }
 
-  // 7. Fluxos de Exceção
-  md += `## 7. Fluxos de Excecao\n\n`;
+  // 8. Fluxos de Exceção
+  md += `## 8. Fluxos de Excecao\n\n`;
   if ((uc.fluxosExcecao || []).length) {
     uc.fluxosExcecao.forEach(e => {
       const anchorId   = e.id.toLowerCase();
@@ -950,11 +962,11 @@ function wikiUCFile(uc, husDoUC, ep, modulo) {
     md += `### FE01 - Fluxo de Excecao\n\n> _Descreva quando este fluxo é acionado._\n\n**Ponto de extensão:** [FP-X](#fp-x)\n\n| Passo | Ator | Acao |\n|-------|------|------|\n| 1 | Sistema | Exibe mensagem MSG001 |\n\n`;
   }
 
-  // 8. Regras de Negócio Aplicadas — com âncoras e origem
+  // 9. Regras de Negócio Aplicadas — com âncoras e origem
   const rnsUC = husDoUC.flatMap(h => h.regrasNegocio || []);
   const rnsSeen = new Set();
   const rnsUniq = rnsUC.filter(r => { if (rnsSeen.has(r.id)) return false; rnsSeen.add(r.id); return true; });
-  md += `## 8. Regras de Negocio Aplicadas\n\n| ID | Nome | Descricao | Origem no Fluxo |\n|----|------|-----------|----------------|\n`;
+  md += `## 9. Regras de Negocio Aplicadas\n\n| ID | Nome | Descricao | Origem no Fluxo |\n|----|------|-----------|----------------|\n`;
   if (rnsUniq.length) {
     rnsUniq.forEach(r => {
       const nome = r.nome || inferRNNome(r.descricao);
@@ -967,10 +979,10 @@ function wikiUCFile(uc, husDoUC, ep, modulo) {
   }
   md += "\n";
 
-  // 9. Requisitos Funcionais (derivados das HUs via IA)
+  // 10. Requisitos Funcionais (derivados das HUs via IA)
   const rfs  = uc.requisitosFuncionais    || [];
   const rnfs = uc.requisitosNaoFuncionais || [];
-  md += `## 9. Requisitos Funcionais\n\n| ID | Descricao | Origem no Fluxo |\n|----|-----------|----------------|\n`;
+  md += `## 10. Requisitos Funcionais\n\n| ID | Descricao | Origem no Fluxo |\n|----|-----------|----------------|\n`;
   if (rfs.length) {
     rfs.forEach(r => {
       const origemNorm = normalizePasso(r.origemPasso);
@@ -982,8 +994,8 @@ function wikiUCFile(uc, husDoUC, ep, modulo) {
   }
   md += "\n";
 
-  // 10. Requisitos Não Funcionais
-  md += `## 10. Requisitos Nao Funcionais\n\n| ID | Categoria | Descricao | Metrica |\n|----|-----------|-----------|--------|\n`;
+  // 11. Requisitos Não Funcionais
+  md += `## 11. Requisitos Nao Funcionais\n\n| ID | Categoria | Descricao | Metrica |\n|----|-----------|-----------|--------|\n`;
   if (rnfs.length) {
     rnfs.forEach(r => {
       md += `| <a id="${r.id.toLowerCase()}"></a>${r.id} | ${r.categoria || "—"} | ${r.descricao} | ${r.metrica || "A definir"} |\n`;
@@ -993,15 +1005,27 @@ function wikiUCFile(uc, husDoUC, ep, modulo) {
   }
   md += "\n";
 
-  // 11. Requisitos Relacionados
-  md += `## 11. Requisitos Relacionados\n\n| ID | Titulo | Tipo |\n|----|--------|------|\n`;
+  // 12. Requisitos Relacionados
+  md += `## 12. Requisitos Relacionados\n\n| ID | Titulo | Tipo |\n|----|--------|------|\n`;
   husDoUC.forEach(h => { md += `| ${h.reqId} | ${h.titulo} | Funcional |\n`; });
   md += "\n";
 
-  // 12. Protótipo / Diagrama
-  md += `## 12. Prototipo / Diagrama\n\n> _Inserir imagem ou link para diagrama BPMN/wireframe._\n`;
+  // 13. Protótipo / Diagrama
+  md += `## 13. Prototipo / Diagrama\n\n> _Inserir imagem ou link para diagrama BPMN/wireframe._\n`;
 
-  return md + wikiHistorico();
+  // 14. Diagrama de Caso de Uso (Mermaid)
+  let mermaid = `\n---\n\n## 14. Diagrama de Caso de Uso\n\n\`\`\`mermaid\nflowchart LR\n`;
+  mermaid += `  actor["${atores[0] || 'Usuario'}"]\n`;
+  mermaid += `  uc(["${uc.ftId}: ${uc.titulo}"])\n`;
+  mermaid += `  actor --> uc\n`;
+  (uc.fluxosAlternativos || []).forEach(fa => {
+    const faId = fa.id.toLowerCase().replace(/\s/g, '_');
+    mermaid += `  fa_${faId}(["${fa.id}: ${fa.titulo || fa.id}"])\n`;
+    mermaid += `  uc -.->|extend| fa_${faId}\n`;
+  });
+  mermaid += `\`\`\`\n`;
+
+  return md + wikiHistorico() + mermaid;
 }
 
 // ── Regras de Negócio ────────────────────────────────────────────
@@ -1113,14 +1137,14 @@ function wikiRFFile(ep, ucsEp, husEp, modulo) {
   );
   let md = wikiYaml(`Requisitos Funcionais - ${titulo}`, modulo, "requisitos-funcionais");
   md += `# Requisitos Funcionais - ${titulo}\n\n`;
-  md += `## Tabela\n\n| ID | Descricao | Origem no Fluxo | Prioridade | Status | Caso de Uso |\n|----|-----------|----------------|-----------|--------|-------------|\n`;
+  md += `## Tabela\n\n| ID | Descricao | Origem no Fluxo | Prioridade | Status | Caso de Uso | Verificacao |\n|----|-----------|----------------|-----------|--------|-------------|-------------|\n`;
   if (rfs.length) {
     rfs.forEach(rf => {
       const desc = (rf.descricao || "").slice(0, 80);
-      md += `| ${rf.id} | ${desc} | ${rf.origemPasso || "—"} | Alta | Em elaboracao | ${rf.ftId} |\n`;
+      md += `| ${rf.id} | ${desc} | ${rf.origemPasso || "—"} | ${rf.prioridade || "Alta"} | Proposto | ${rf.ftId} | ${rf.verificacao || "A definir"} |\n`;
     });
   } else {
-    md += `| RF-MOD-001 | O sistema deve... | FP-1 | Alta | Em elaboracao | — |\n`;
+    md += `| RF-MOD-001 | O sistema deve... | FP-1 | Alta | Proposto | — | A definir |\n`;
   }
   md += `\n---\n\n## Detalhamento\n\n`;
   if (rfs.length) {
@@ -1131,10 +1155,11 @@ function wikiRFFile(ep, ucsEp, husEp, modulo) {
       md += `**Descricao:** ${rf.descricao}\n\n`;
       md += `**Origem no Fluxo:** ${rf.origemPasso || "—"}\n\n`;
       md += ucSlug ? `**Caso de Uso:** [${uc.ftId} — ${uc.titulo}](Casos-de-Uso/${ucSlug})\n\n` : `**Caso de Uso:** —\n\n`;
-      md += `**Prioridade:** Alta\n\n**Status:** Em elaboracao\n\n`;
+      md += `**Prioridade:** ${rf.prioridade || "Alta"}\n\n**Status:** Proposto\n\n`;
+      md += `**Criterio de Verificacao:** ${rf.verificacao || "A definir"}\n\n`;
     });
   } else {
-    md += `### RF-MOD-001\n\n**Descricao:** O sistema deve...\n\n**Origem no Fluxo:** —\n\n**Caso de Uso:** —\n\n**Prioridade:** Alta\n\n**Status:** Em elaboracao\n\n`;
+    md += `### RF-MOD-001\n\n**Descricao:** O sistema deve...\n\n**Origem no Fluxo:** —\n\n**Caso de Uso:** —\n\n**Prioridade:** Alta\n\n**Status:** Proposto\n\n**Criterio de Verificacao:** A definir\n\n`;
   }
   return md + wikiHistorico();
 }
@@ -1152,12 +1177,12 @@ function wikiRNFFile(ep, ucsEp, modulo) {
   if (rnfs.length) {
     rnfs.forEach(rnf => {
       const desc = (rnf.descricao || "").slice(0, 70);
-      md += `| ${rnf.id} | ${rnf.categoria || "—"} | ${desc} | ${rnf.metrica || "A definir"} | Alta | ${rnf.ftId} |\n`;
+      md += `| ${rnf.id} | ${rnf.categoria || "—"} | ${desc} | ${rnf.metrica || "A definir"} | ${rnf.prioridade || "Alta"} | ${rnf.ftId} |\n`;
     });
   } else {
-    md += `| RNF-MOD-001 | Performance | O sistema deve responder em ate 500ms | <= 500ms P95 | Alta | — |\n`;
-    md += `| RNF-MOD-002 | Disponibilidade | O sistema deve garantir uptime do modulo | >= 99,5% ao mes | Alta | — |\n`;
-    md += `| RNF-MOD-003 | Seguranca | O sistema deve criptografar dados sensiveis | AES-256 | Alta | — |\n`;
+    md += `| RNF-MOD-001 | Performance Efficiency | O sistema deve responder em ate 500ms | <= 500ms P95 | Alta | — |\n`;
+    md += `| RNF-MOD-002 | Reliability | O sistema deve garantir uptime do modulo | >= 99,5% ao mes | Alta | — |\n`;
+    md += `| RNF-MOD-003 | Security | O sistema deve criptografar dados sensiveis | AES-256 | Alta | — |\n`;
   }
   md += `\n---\n\n## Detalhamento por Categoria\n\n`;
   if (rnfs.length) {
@@ -1170,12 +1195,13 @@ function wikiRNFFile(ep, ucsEp, modulo) {
         const ucSlug = uc ? `${uc.ftId}-${toSlug(uc.titulo)}` : null;
         md += `**${rnf.id}** — ${rnf.descricao}\n`;
         md += `- **Metrica:** ${rnf.metrica || "A definir"}\n`;
+        md += `- **Prioridade:** ${rnf.prioridade || "Alta"}\n`;
         md += ucSlug ? `- **Caso de Uso:** [${uc.ftId} — ${uc.titulo}](Casos-de-Uso/${ucSlug})\n` : `- **Caso de Uso:** —\n`;
         md += `\n`;
       });
     });
   } else {
-    md += `### Performance\n> A definir — tempo de resposta e throughput esperados.\n\n### Seguranca\n> A definir — controles de acesso e criptografia.\n\n### Escalabilidade\n> A definir — capacidade maxima e comportamento sob carga.\n\n### Disponibilidade\n> A definir — SLA, janelas de manutencao, RTO/RPO.\n\n### Usabilidade\n> A definir — padroes de acessibilidade e UX.\n\n`;
+    md += `### Performance Efficiency\n> A definir — tempo de resposta e throughput esperados.\n\n### Security\n> A definir — controles de acesso e criptografia.\n\n### Reliability\n> A definir — capacidade maxima e comportamento sob carga.\n\n### Usability\n> A definir — SLA, janelas de manutencao, RTO/RPO.\n\n### Compatibility\n> A definir — padroes de acessibilidade e UX.\n\n`;
   }
   return md + wikiHistorico();
 }
@@ -1208,11 +1234,11 @@ function wikiCORUCIndex(corUCs) {
     md += `| ID | Nome | Status |\n|----|------|--------|\n`;
     corUCs.forEach(uc => {
       const slug = `${uc.ftId}-${toSlug(uc.titulo)}`;
-      md += `| ${uc.ftId} | [${uc.titulo}](${slug}) | Em elaboracao |\n`;
+      md += `| ${uc.ftId} | [${uc.titulo}](${slug}) | Proposto |\n`;
     });
   } else {
     md += `| ID | Nome | Status |\n|----|------|--------|\n`;
-    md += `| FT001 | Nome da Feature | Em elaboracao |\n`;
+    md += `| FT001 | Nome da Feature | Proposto |\n`;
   }
   return md + wikiHistorico();
 }
@@ -1287,14 +1313,14 @@ function wikiCORRFGlobal(allUCs, allHus) {
   );
   let md = wikiYaml("Requisitos Funcionais - COR", "COR", "requisitos-funcionais");
   md += `# Requisitos Funcionais - COR\n\n`;
-  md += `## Tabela\n\n| ID | Descricao | Origem no Fluxo | Prioridade | Status | Caso de Uso |\n|----|-----------|----------------|-----------|--------|-------------|\n`;
+  md += `## Tabela\n\n| ID | Descricao | Origem no Fluxo | Prioridade | Status | Caso de Uso | Verificacao |\n|----|-----------|----------------|-----------|--------|-------------|-------------|\n`;
   if (rfs.length) {
     rfs.forEach(rf => {
       const desc = (rf.descricao || "").slice(0, 80);
-      md += `| ${rf.id} | ${desc} | ${rf.origemPasso || "—"} | Alta | Em elaboracao | ${rf.ftId} |\n`;
+      md += `| ${rf.id} | ${desc} | ${rf.origemPasso || "—"} | ${rf.prioridade || "Alta"} | Proposto | ${rf.ftId} | ${rf.verificacao || "A definir"} |\n`;
     });
   } else {
-    md += `| RF-COR-001 | O sistema deve... | FP-1 | Alta | Em elaboracao | — |\n`;
+    md += `| RF-COR-001 | O sistema deve... | FP-1 | Alta | Proposto | — | A definir |\n`;
   }
   md += `\n---\n\n## Detalhamento\n\n`;
   if (rfs.length) {
@@ -1305,10 +1331,11 @@ function wikiCORRFGlobal(allUCs, allHus) {
       md += `**Descricao:** ${rf.descricao}\n\n`;
       md += `**Origem no Fluxo:** ${rf.origemPasso || "—"}\n\n`;
       md += ucSlug ? `**Caso de Uso:** [${uc.ftId} — ${uc.titulo}](Casos-de-Uso/${ucSlug})\n\n` : `**Caso de Uso:** —\n\n`;
-      md += `**Prioridade:** Alta\n\n**Status:** Em elaboracao\n\n`;
+      md += `**Prioridade:** ${rf.prioridade || "Alta"}\n\n**Status:** Proposto\n\n`;
+      md += `**Criterio de Verificacao:** ${rf.verificacao || "A definir"}\n\n`;
     });
   } else {
-    md += `### RF-COR-001\n\n**Descricao:** O sistema deve...\n\n**Origem no Fluxo:** —\n\n**Caso de Uso:** —\n\n**Prioridade:** Alta\n\n**Status:** Em elaboracao\n\n`;
+    md += `### RF-COR-001\n\n**Descricao:** O sistema deve...\n\n**Origem no Fluxo:** —\n\n**Caso de Uso:** —\n\n**Prioridade:** Alta\n\n**Status:** Proposto\n\n**Criterio de Verificacao:** A definir\n\n`;
   }
   return md + wikiHistorico();
 }
@@ -1324,12 +1351,12 @@ function wikiCORRNF(allUCs) {
   if (rnfs.length) {
     rnfs.forEach(rnf => {
       const desc = (rnf.descricao || "").slice(0, 70);
-      md += `| ${rnf.id} | ${rnf.categoria || "—"} | ${desc} | ${rnf.metrica || "A definir"} | Alta | ${rnf.ftId} |\n`;
+      md += `| ${rnf.id} | ${rnf.categoria || "—"} | ${desc} | ${rnf.metrica || "A definir"} | ${rnf.prioridade || "Alta"} | ${rnf.ftId} |\n`;
     });
   } else {
-    md += `| RNF-COR-001 | Performance | O sistema deve responder em ate 500ms | <= 500ms P95 | Alta | — |\n`;
-    md += `| RNF-COR-002 | Disponibilidade | O sistema deve garantir uptime global | >= 99,5% ao mes | Alta | — |\n`;
-    md += `| RNF-COR-003 | Seguranca | O sistema deve criptografar dados sensiveis | AES-256 | Alta | — |\n`;
+    md += `| RNF-COR-001 | Performance Efficiency | O sistema deve responder em ate 500ms | <= 500ms P95 | Alta | — |\n`;
+    md += `| RNF-COR-002 | Reliability | O sistema deve garantir uptime global | >= 99,5% ao mes | Alta | — |\n`;
+    md += `| RNF-COR-003 | Security | O sistema deve criptografar dados sensiveis | AES-256 | Alta | — |\n`;
   }
   md += `\n---\n\n## Detalhamento por Categoria\n\n`;
   if (rnfs.length) {
@@ -1342,12 +1369,13 @@ function wikiCORRNF(allUCs) {
         const ucSlug = uc ? `${uc.ftId}-${toSlug(uc.titulo)}` : null;
         md += `**${rnf.id}** — ${rnf.descricao}\n`;
         md += `- **Metrica:** ${rnf.metrica || "A definir"}\n`;
+        md += `- **Prioridade:** ${rnf.prioridade || "Alta"}\n`;
         md += ucSlug ? `- **Caso de Uso:** [${uc.ftId} — ${uc.titulo}](Casos-de-Uso/${ucSlug})\n` : `- **Caso de Uso:** —\n`;
         md += `\n`;
       });
     });
   } else {
-    md += `### Performance\n> A definir — tempo de resposta e throughput esperados.\n\n### Seguranca\n> A definir — controles de acesso e criptografia.\n\n### Escalabilidade\n> A definir — capacidade maxima e comportamento sob carga.\n\n### Disponibilidade\n> A definir — SLA, janelas de manutencao, RTO/RPO.\n\n### Usabilidade\n> A definir — padroes de acessibilidade e UX.\n\n`;
+    md += `### Performance Efficiency\n> A definir — tempo de resposta e throughput esperados.\n\n### Security\n> A definir — controles de acesso e criptografia.\n\n### Reliability\n> A definir — capacidade maxima e comportamento sob carga.\n\n### Usability\n> A definir — SLA, janelas de manutencao, RTO/RPO.\n\n### Compatibility\n> A definir — padroes de acessibilidade e UX.\n\n`;
   }
   return md + wikiHistorico();
 }
@@ -1913,7 +1941,7 @@ export default function AgenteRequisitos() {
     try {
       for (let i = 0; i < ucs.length; i++) {
         log(`◎ Gerando testes para ${ucs[i].ftId}...`, i, ucs.length);
-        result.push(...await fase4_gerarCTs(ucs[i], hus.filter(h => h.ucId === ucs[i].ucId)));
+        result.push(...await fase4_gerarCTs(ucs[i], hus.filter(h => h.ucId === ucs[i].ucId), "", (ucs[i].requisitosNaoFuncionais || [])));
       }
       setCts(result);
       goToPhase(5);
@@ -1987,7 +2015,7 @@ export default function AgenteRequisitos() {
     try {
       for (let i = 0; i < ucs.length; i++) {
         log(`◎ Regerando testes para ${ucs[i].ftId}...`, i, ucs.length);
-        result.push(...await fase4_gerarCTs(ucs[i], hus.filter(h => h.ucId === ucs[i].ucId), corrCTs));
+        result.push(...await fase4_gerarCTs(ucs[i], hus.filter(h => h.ucId === ucs[i].ucId), corrCTs, (ucs[i].requisitosNaoFuncionais || [])));
       }
       setCts(result);
       setCorrCTs("");
@@ -2101,7 +2129,6 @@ export default function AgenteRequisitos() {
 
   // ── Formata HU como HTML para Azure DevOps ───────────────────────
   function huToHtml(hu) {
-    const apf = hu.apf || {};
     const rns = (hu.regrasNegocio || []);
     return [
       `<h3>História de Usuário</h3>`,
@@ -2109,14 +2136,6 @@ export default function AgenteRequisitos() {
       `<b>Quero</b> ${hu.quero || "—"}<br/>`,
       `<b>Para</b> ${hu.para || "—"}</p>`,
       `<hr/>`,
-      `<h4>APF — Análise de Ponto de Função</h4>`,
-      `<table border="1" cellpadding="4" style="border-collapse:collapse">`,
-      `<tr><th>Tipo</th><td>${apf.tipo || "—"}</td></tr>`,
-      `<tr><th>Back-End</th><td>${(apf.be || []).join(", ") || "—"}</td></tr>`,
-      `<tr><th>Front-End</th><td>${(apf.fe || []).join(", ") || "—"}</td></tr>`,
-      `<tr><th>Dados</th><td>${(apf.dados || []).join(", ") || "—"}</td></tr>`,
-      `<tr><th>Arquivos</th><td>${(apf.arquivos || []).join(", ") || "—"}</td></tr>`,
-      `</table>`,
       rns.length ? [
         `<h4>Regras de Negócio</h4>`,
         `<ul>${rns.map(r => `<li><b>${r.id}${r.nome ? ` — ${r.nome}` : ""}</b>: ${r.descricao}</li>`).join("")}</ul>`,
@@ -2422,7 +2441,6 @@ export default function AgenteRequisitos() {
                 {(conteudo || "").split("\n").slice(0, 6).map((line, i) => {
                   const kw = line.match(/^(Como |Quero |Para )/);
                   if (kw) return <div key={i} style={{ marginBottom: 3 }}><span style={{ color: C.green, fontWeight: 700 }}>{kw[0]}</span><span style={{ color: C.text }}>{line.slice(kw[0].length)}</span></div>;
-                  if (line.startsWith("APF")) return <div key={i} style={{ color: C.accent, fontSize: 11, marginTop: 6, marginBottom: 2 }}>{line}</div>;
                   return null;
                 })}
                 {/* Critérios resumidos */}
@@ -2494,9 +2512,7 @@ export default function AgenteRequisitos() {
   };
 
   const huToText = hu => {
-    const apf = hu.apf || {};
     let t = `${hu.reqId}\n${hu.ftId} (${hu.epicId})\n\nComo ${hu.como}\nQuero ${hu.quero}\nPara ${hu.para}\n\n`;
-    t += `APF — Tipo: ${apf.tipo || "—"}\n  BE: ${(apf.be || []).join(", ")} | FE: ${(apf.fe || []).join(", ")}\n  Dados: ${(apf.dados || []).join(", ")} | Arquivos: ${(apf.arquivos || []).join(", ")}\n\n`;
     t += `Regras de Negócio:\n`;
     (hu.regrasNegocio || []).forEach(r => { t += `  ${r.id}${r.nome ? ` — ${r.nome}` : ""}: ${r.descricao}\n`; });
     t += `\nCritérios de Aceitação:\n`;
