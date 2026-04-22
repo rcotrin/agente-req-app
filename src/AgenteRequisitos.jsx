@@ -4408,7 +4408,7 @@ function LuAI({ phase }) {
           onClick={() => setBubble(b => !b)}
           title={bubble ? "Fechar dica" : "Ver dica"}
           style={{
-            width: 140, height: 140, borderRadius: "50%",
+            width: 134, height: 134, borderRadius: "50%",
             overflow: "hidden", cursor: "pointer",
             border: "3px solid #39ADE3",
             background: "#14243a",
@@ -4417,15 +4417,7 @@ function LuAI({ phase }) {
             animation: waving ? "luWave .6s ease 2" : "luFloat 3s ease-in-out infinite",
             transition: "transform .2s",
           }}>
-          <img src="/luai.jpg" alt="Lu — Assistente" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "50% 28%" }} />
-          {/* Overlay de piscar — cobre apenas a região dos olhos */}
-          <div style={{
-            position: "absolute", left: "20%", right: "20%",
-            top: "40%", height: "10%",
-            background: "#c8a882", borderRadius: 6,
-            opacity: 0,
-            animation: "luEyeBlink 5s ease-in-out infinite",
-          }} />
+          <img src="/luai.jpg" alt="Lu — Assistente" style={{ width: "100%", height: "100%", objectFit: "contain", transform: "scale(1.4)" }} />
         </div>
         <button
           onClick={() => setVisible(false)}
@@ -4438,7 +4430,6 @@ function LuAI({ phase }) {
         @keyframes luFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
         @keyframes luWave  { 0%,100%{transform:rotate(0deg)} 25%{transform:rotate(-8deg)} 75%{transform:rotate(8deg)} }
         @keyframes luSlide { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
-        @keyframes luEyeBlink { 0%,44%,46%,100%{opacity:0} 45%{opacity:1} }
       `}</style>
     </div>
   );
