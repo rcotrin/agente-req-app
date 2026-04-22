@@ -3498,6 +3498,9 @@ export default function AgenteRequisitos() {
         )}
       </div>
 
+      {/* ── LuAI — assistente visual ─────────────────────────────── */}
+      <LuAI phase={phase} />
+
       {/* ── Manual Modal ─────────────────────────────────────────── */}
       {manualOpen && (
         <div onClick={e => e.target === e.currentTarget && setManualOpen(false)}
@@ -4344,6 +4347,88 @@ function DevOpsWorkItem({ type, typeColor, title, description, acceptanceCriteri
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Componente: LuAI — assistente visual fixo ───────────────────
+const LUAI_TIPS = [
+  "Olá! Sou o Lu, seu assistente. Carregue um documento PDF, DOCX, TXT ou MD para começarmos!",
+  "Documento carregado! Revise o texto extraído e clique em Gerar Épicos quando estiver pronto.",
+  "Épicos gerados! Verifique se as grandes áreas de negócio fazem sentido antes de continuar.",
+  "Features e Casos de Uso prontos! Confira os fluxos principal e alternativo de cada UC.",
+  "Requisitos gerados! Olha o painel de Auditoria — se tiver alertas em vermelho, vale corrigir.",
+  "Casos de Teste criados! Garanta que cada requisito tem pelo menos um CT de cobertura.",
+  "Revisão completa! Tudo aprovado? Então é hora de ir para o Azure DevOps!",
+  "Configure sua organização e PAT do Azure DevOps e exporte os work items.",
+];
+
+function LuAI({ phase }) {
+  const [visible, setVisible]   = useState(true);
+  const [bubble,  setBubble]    = useState(true);
+  const [waving,  setWaving]    = useState(false);
+  const tip = LUAI_TIPS[Math.min(phase, LUAI_TIPS.length - 1)];
+
+  // Reexibe o balão sempre que a fase muda
+  useEffect(() => {
+    setBubble(true);
+    setWaving(true);
+    const t = setTimeout(() => setWaving(false), 1200);
+    return () => clearTimeout(t);
+  }, [phase]);
+
+  if (!visible) return (
+    <button
+      onClick={() => { setVisible(true); setBubble(true); }}
+      title="Chamar Lu"
+      style={{ position: "fixed", bottom: 20, right: 20, zIndex: 900, width: 44, height: 44, borderRadius: "50%", border: "2px solid #39ADE3", background: "#fff", cursor: "pointer", fontSize: 20, boxShadow: "0 4px 16px #00366C22", transition: "all .2s" }}>
+      🙂
+    </button>
+  );
+
+  return (
+    <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 900, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10, pointerEvents: "none" }}>
+
+      {/* Balão de dica */}
+      {bubble && (
+        <div style={{ pointerEvents: "auto", maxWidth: 240, background: "#FFFFFF", border: "1px solid #E8ECF5", borderRadius: "12px 12px 4px 12px", padding: "12px 14px", boxShadow: "0 4px 20px #00366C18", position: "relative", animation: "luSlide .3s ease" }}>
+          <button
+            onClick={() => setBubble(false)}
+            style={{ position: "absolute", top: 6, right: 8, background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "#94a3b8", lineHeight: 1, pointerEvents: "auto" }}>✕</button>
+          <div style={{ fontFamily: "'Roboto',sans-serif", fontSize: 12, color: "#444762", lineHeight: 1.6, paddingRight: 14 }}>
+            {tip}
+          </div>
+          <div style={{ marginTop: 8, fontSize: 10, fontFamily: "'Manrope',sans-serif", fontWeight: 700, color: "#39ADE3", letterSpacing: "0.06em" }}>LU · ASSISTENTE</div>
+        </div>
+      )}
+
+      {/* Avatar */}
+      <div style={{ pointerEvents: "auto", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+        <div
+          onClick={() => setBubble(b => !b)}
+          title={bubble ? "Fechar dica" : "Ver dica"}
+          style={{
+            width: 80, height: 80, borderRadius: "50%",
+            overflow: "hidden", cursor: "pointer",
+            border: "3px solid #39ADE3",
+            boxShadow: "0 4px 20px #00366C30",
+            animation: waving ? "luWave .6s ease 2" : "luFloat 3s ease-in-out infinite",
+            transition: "transform .2s",
+          }}>
+          <img src="/luai.jpg" alt="Lu — Assistente" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top" }} />
+        </div>
+        <button
+          onClick={() => setVisible(false)}
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 10, color: "#94a3b8", fontFamily: "'Roboto',sans-serif", padding: 0 }}>
+          minimizar
+        </button>
+      </div>
+
+      <style>{`
+        @keyframes luFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+        @keyframes luWave  { 0%,100%{transform:rotate(0deg)} 25%{transform:rotate(-8deg)} 75%{transform:rotate(8deg)} }
+        @keyframes luSlide { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+      `}</style>
     </div>
   );
 }
