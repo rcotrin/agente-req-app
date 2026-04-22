@@ -97,7 +97,7 @@ function ucToRNPrefix(title) {
 // CLAUDE API
 // ════════════════════════════════════════════════════════════════════
 
-async function claude(prompt, system, maxTokens = 4000, model = "claude-sonnet-4-6") {
+async function claude(prompt, system, maxTokens = 4000, model = "claude-opus-4-7") {
   const key = _apiKey || sessionStorage.getItem("anthropic_key") || "";
   if (!key) throw new Error("API key não configurada. Insira sua chave Anthropic antes de continuar.");
   _apiKey = key;
