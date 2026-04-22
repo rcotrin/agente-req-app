@@ -227,7 +227,7 @@ IMPORTANTE: Retorne SOMENTE o objeto JSON, sem texto adicional, sem markdown, se
 async function fase1b_gerarEpicos(funcList, correction = "") {
   const system = `Você é um Analista de Requisitos Sênior. Agrupe as funcionalidades em Épicos.
 REGRAS:
-1. Épico = módulo/domínio de negócio. Nome: verbo infinitivo + objeto, máx 60 chars. ID: EP001, EP002...
+1. Épico = módulo/domínio de negócio. Nome: OBRIGATORIAMENTE verbo no infinitivo + objeto, máx 60 chars. ID: EP001, EP002... Exemplos corretos: "Gerenciar Pagamentos", "Processar Conciliação DDA", "Controlar Acesso". ERRADO: "Gestão de Pagamentos", "Processamento DDA", "Controle de Acesso".
 2. CRUD consolidado: se 2+ operações CRUD (Inserir/Alterar/Excluir/Consultar) da mesma entidade → liste essa entidade em "manterEntidades". O UC será gerado como "Manter [Entidade]".
 3. Cada Épico deve ter 3-10 funcionalidades relacionadas.
 4. ÉPICO COR (OBRIGATÓRIO SE EXISTIR): Se houver funcionalidades TRANSVERSAIS ao sistema (autenticação, autorização, perfis/permissões, auditoria/log, tratamento global de erros, configurações do sistema, gestão de sessão, notificações globais, gestão de usuários), crie UM épico com id "COR" e titulo "COR - Funcionalidades Transversais". Funcionalidades COR NÃO pertencem a nenhum módulo de negócio específico. Se não houver funcionalidades transversais, NÃO crie o épico COR.
@@ -250,7 +250,7 @@ async function fase2_gerarUCsParaEpico(epico, funcList, ucStartIdx, correction =
   const system = `Você é um Analista de Requisitos UML 2.5.1. Gere TODOS os Casos de Uso do Épico.
 REGRAS OBRIGATÓRIAS:
 1. PADRÃO MANTER: CRUD da mesma entidade → UM UC "Manter [Entidade]". Fluxo principal = Consultar. Alternativos: FA1=Incluir, FA2=Alterar, FA3=Excluir. NÃO gere UCs separados para cada operação CRUD.
-2. Nome do UC: verbo infinitivo + objeto.
+2. Nome do UC: OBRIGATORIAMENTE verbo no infinitivo + objeto. Exemplos corretos: "Consultar Extrato", "Realizar Transferência", "Manter Usuário". ERRADO: "Consulta de Extrato", "Transferência entre Contas", "Gestão de Usuários".
 3. Máx 7 passos no fluxo principal, máx 3 alternativos, máx 2 exceções. Último passo SEMPRE = "Caso de uso encerra."
 4. IDs serão corrigidos pelo sistema — use FT001, FT002... como placeholder sequencial.
 5. RASTREABILIDADE (obrigatório):
@@ -315,7 +315,8 @@ async function fase3_gerarHUsParaUC(uc, huStartIdx, correction = "", rnPrefix = 
 REGRAS OBRIGATÓRIAS:
 1. Mínimo 1 HU obrigatória. UCs "Manter" geram pelo menos 2 HUs (Consultar + Manter dados).
 2. "como": OBRIGATÓRIO — persona específica com perfil (ex: "Usuário com perfil Administrador"). NUNCA deixe vazio.
-3. "quero": OBRIGATÓRIO — ação clara em verbo infinitivo. NUNCA deixe vazio.
+3. "quero": OBRIGATÓRIO — ação clara em verbo no infinitivo. Exemplos: "consultar o saldo da conta", "registrar novo pagamento recorrente". NUNCA deixe vazio.
+3b. "workItem.titulo": OBRIGATÓRIO — deve iniciar com verbo no infinitivo. Ex: "Consultar Saldo da Conta", "Registrar Pagamento Recorrente". NUNCA use substantivos como título: ERRADO "Consulta de Saldo", "Registro de Pagamento".
 4. APF tipo: "Perfectiva", "Corretiva" ou "Adaptativa".
 5. APF be/fe: subconjunto de ["Inclusão","Alteração","Exclusão","Consulta","NA"].
 6. APF dados: subconjunto de ["Internos","Externos","NA"]. APF arquivos: subconjunto de ["Download","Upload","Impressão","NA"].
@@ -376,10 +377,10 @@ async function enrichRNNames(hus) {
 
   const system = `Você é um analista de requisitos sênior. Para cada regra de negócio recebida, gere um NOME curto e semântico.
 REGRAS DO NOME:
-1. Substantivo composto em Title Case, máx 4 palavras, SEM artigos e SEM preposições.
-2. Deve capturar a ESSÊNCIA da regra — o conceito de negócio central.
-3. Exemplos corretos: "Limite Diário Transação", "Bloqueio Conta Inadimplente", "Prazo Liquidação PIX", "Autenticação Duplo Fator".
-4. Exemplos ERRADOS: "O valor não pode", "Regra sobre limite", "Validação de dados".
+1. Verbo no infinitivo + complemento, Title Case, máx 5 palavras, SEM artigos e SEM preposições.
+2. Deve capturar a AÇÃO de negócio central da regra.
+3. Exemplos corretos: "Limitar Transação Diária", "Bloquear Conta Inadimplente", "Validar Prazo Liquidação PIX", "Exigir Autenticação Duplo Fator".
+4. Exemplos ERRADOS: "Limite Diário Transação", "Bloqueio Conta", "O valor não pode", "Regra sobre limite".
 Retorne SOMENTE JSON sem markdown: {"rns":[{"id":"RN001","nome":"Nome Semantico"}]}`;
 
   const raw = await claude(
@@ -419,8 +420,10 @@ async function enrichRFRNF(hus, ucs) {
 2. REQUISITOS NÃO FUNCIONAIS (RNF): restrições de qualidade (Performance, Segurança, Disponibilidade, Usabilidade, Escalabilidade). IDs: "RNF-${prefix}-001"...
 REGRAS:
 - Máx 5 RF e 4 RNF por UC. Se não houver conteúdo suficiente, retorne arrays vazios [].
+- descricao RF: OBRIGATÓRIO iniciar com verbo no infinitivo. Ex: "Validar saldo disponível antes de autorizar a transação", "Registrar log de auditoria para cada operação". ERRADO: "O sistema deve validar...", "É necessário registrar...".
 - origemPasso: passo do FP relacionado (ex: "FP-2"). Use "" se não aplicável.
 - categoria RNF: uma de "Performance" | "Segurança" | "Disponibilidade" | "Usabilidade" | "Escalabilidade".
+- descricao RNF: OBRIGATÓRIO iniciar com verbo no infinitivo. Ex: "Processar requisição em até 500ms sob carga de 200 usuários simultâneos".
 - metrica RNF: valor mensurável quando disponível (ex: "<= 500ms"), caso contrário "A definir".
 Retorne SOMENTE JSON sem markdown:
 {"rf":[{"id":"RF-${prefix}-001","descricao":"string","origemPasso":"FP-2"}],"rnf":[{"id":"RNF-${prefix}-001","categoria":"Performance","descricao":"string","metrica":"string"}]}`;
