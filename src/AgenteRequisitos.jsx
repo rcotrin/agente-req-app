@@ -802,11 +802,11 @@ Retorne SOMENTE JSON sem markdown:
   const raw = await claude(
     `ÓRFÃOS:\n${JSON.stringify(orfaosInfo, null, 2)}\n\nLACUNAS:\n${JSON.stringify(lacunasInfo, null, 2)}\n\nPASSOS DISPONÍVEIS:\n${JSON.stringify(allSteps, null, 2)}\n\nSugira a melhor ação para cada órfão.`,
     system,
-    2500,
+    4096,
     "claude-haiku-4-5-20251001"
   );
 
-  return safeJSON(raw)?.sugestoes || [];
+  return (safeJSON(raw) || recoverPartialJSON(raw))?.sugestoes || [];
 }
 
 // ════════════════════════════════════════════════════════════════════
