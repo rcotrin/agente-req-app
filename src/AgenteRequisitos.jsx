@@ -481,10 +481,14 @@ Retorne SOMENTE JSON sem markdown:
       // Só limpa quando temos dados válidos para substituir
       epicUCs.forEach(uc => { uc.requisitosFuncionais = []; uc.requisitosNaoFuncionais = []; });
 
+      const validEpicFtIds = new Set(epicUCs.map(u => u.ftId));
+
       // Distribui cada RF para o UC primário (primeiro em ucRefs)
       rfs.forEach(rf => {
-        const primaryFtId = (rf.ucRefs || [])[0] || epicUCs[0].ftId;
-        const owner = epicUCs.find(u => u.ftId === primaryFtId) || epicUCs[0];
+        // Normaliza ucRefs — filtra IDs inválidos; fallback para primeiro UC do épico
+        const validRefs = (rf.ucRefs || []).filter(id => validEpicFtIds.has(id));
+        rf.ucRefs = validRefs.length ? validRefs : [epicUCs[0].ftId];
+        const owner = epicUCs.find(u => u.ftId === rf.ucRefs[0]) || epicUCs[0];
         owner.requisitosFuncionais.push(rf);
       });
       // RNFs ficam no primeiro UC do épico (são épico-wide)
@@ -4289,14 +4293,14 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
           <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: total > 0 ? (lacunas.length ? CR : CA) : CG }}>
             AUDITORIA DE REFERÊNCIAS
           </span>
-          {lacunas.length > 0 && (
+          {(lacunas.length + lacunasRF.length + lacunasRNF.length) > 0 && (
             <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, background: CR + "18", color: CR, fontWeight: 700 }}>
-              {lacunas.length} lacuna{lacunas.length > 1 ? "s" : ""}
+              {lacunas.length + lacunasRF.length + lacunasRNF.length} lacuna{(lacunas.length + lacunasRF.length + lacunasRNF.length) > 1 ? "s" : ""}
             </span>
           )}
-          {orfaos.length > 0 && (
+          {(orfaos.length + orfaosRF.length + orfaosRNF.length) > 0 && (
             <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, background: CA + "18", color: CA, fontWeight: 700 }}>
-              {orfaos.length} órfão{orfaos.length > 1 ? "s" : ""}
+              {orfaos.length + orfaosRF.length + orfaosRNF.length} órfão{(orfaos.length + orfaosRF.length + orfaosRNF.length) > 1 ? "s" : ""}
             </span>
           )}
           {total === 0 && (
