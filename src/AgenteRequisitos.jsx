@@ -4146,7 +4146,8 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
 
   const semRFGlobal  = ucs.every(u => !(u.requisitosFuncionais    || []).length);
   const semRNFGlobal = ucs.every(u => !(u.requisitosNaoFuncionais || []).length);
-  const showEnrichBtn = semRFGlobal || semRNFGlobal;
+  // Sempre visível quando há UCs — permite re-gerar após mudança de prompt ou correção
+  const showEnrichBtn = ucs.length > 0;
 
   const handleResolverOrfaos = async () => {
     if (resolving) return;
@@ -4265,7 +4266,7 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
           <button
             onClick={onEnrichRFRNF}
             disabled={enrichingRFRNF}
-            title={semRFGlobal && semRNFGlobal ? "Nenhuma Feature possui RF/RNF — clique para extrair" : semRFGlobal ? "Nenhum RF extraído" : "Nenhum RNF extraído"}
+            title={semRFGlobal && semRNFGlobal ? "Nenhum RF/RNF extraído — clique para gerar" : "Re-gerar RF/RNF consolidados por épico"}
             style={{
               fontSize: 10, padding: "4px 12px", borderRadius: 5, flexShrink: 0,
               border: "1px solid #0369a1", color: enrichingRFRNF ? "#94a3b8" : "#0369a1",
