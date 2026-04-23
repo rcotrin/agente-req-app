@@ -968,10 +968,10 @@ function auditarReferencias(ucs, hus) {
   const mkOrfaos = (defs, refs) =>
     [...defs].filter(id => !refs.has(id)).sort();
 
-  // RF/RNF são capacidades ligadas via ucRefs (populadas por enrichRFRNF).
-  // Não auditamos órfãos RF/RNF: ações de fix (vincular) adicionam a p.refs,
-  // não a ucRefs, criando um loop infinito de detecção. Apenas lacunas são auditadas.
-  const orfaosRF  = [];
+  // RF órfão = definido em requisitosFuncionais mas nunca citado em nenhum passo (p.refs ou inline).
+  // Mesma lógica de RN órfão — sem ucRefs, sem loop. "vincular" adiciona a p.refs → some do Set.
+  const orfaosRF  = mkOrfaos(definidosRF,  referenciadosRF);
+  // RNF não precisa estar vinculado a passos específicos do fluxo.
   const orfaosRNF = [];
 
   return {
@@ -1132,11 +1132,24 @@ function wikiUCFile(uc, husDoUC, ep, modulo) {
   // 10. Requisitos Funcionais (derivados das HUs via IA)
   const rfs  = uc.requisitosFuncionais    || [];
   const rnfs = uc.requisitosNaoFuncionais || [];
+  // Mapeia rfId → passos que o referenciam via p.refs (para "Origem no Fluxo")
+  const rfStepMap = {};
+  (uc.fluxoPrincipal || []).forEach(p => {
+    safeRefs(p.refs).forEach(id => {
+      if (id.startsWith("RF-")) {
+        if (!rfStepMap[id]) rfStepMap[id] = [];
+        rfStepMap[id].push(p.passo);
+      }
+    });
+  });
   md += `## 10. Requisitos Funcionais\n\n| ID | Descricao | Origem no Fluxo |\n|----|-----------|----------------|\n`;
   if (rfs.length) {
     rfs.forEach(r => {
-      const origemNorm = normalizePasso(r.origemPasso);
-      const origemLink = origemNorm ? `[${origemNorm}](#${origemNorm.toLowerCase()})` : "—";
+      const passos = (rfStepMap[r.id] || []).map(passo => {
+        const norm = normalizePasso(passo) || `FP-${passo}`;
+        return `[${norm}](#${norm.toLowerCase()})`;
+      });
+      const origemLink = passos.length ? passos.join(", ") : "—";
       md += `| <a id="${r.id.toLowerCase()}"></a>${r.id} | ${r.descricao} | ${origemLink} |\n`;
     });
   } else {
@@ -2306,12 +2319,13 @@ export default function AgenteRequisitos() {
   };
 
   const handleLinkOrphanToStep = (rnId, ftId, rawPasso) => {
+    const targetNorm = normalizePasso(rawPasso);
     setUcs(prev => prev.map(uc => {
       if (uc.ftId !== ftId) return uc;
       return {
         ...uc,
         fluxoPrincipal: (uc.fluxoPrincipal || []).map(p => {
-          if (p.passo !== rawPasso) return p;
+          if (normalizePasso(p.passo) !== targetNorm) return p;
           const currentRefs = safeRefs(p.refs);
           if (currentRefs.includes(rnId)) return p;
           return { ...p, refs: [...currentRefs, rnId] };
