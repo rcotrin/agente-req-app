@@ -828,21 +828,22 @@ async function resolverOrfaosIA(orfaosInfo, lacunas, ucs) {
       .join(" | "),
   }));
 
-  const system = `Você é um analista de requisitos sênior. Processe ÓRFÃOS e LACUNAS e sugira uma ação para cada item.
+  const system = `Você é um analista de requisitos sênior. Para cada item na lista abaixo escolha UMA ação.
 
-ÓRFÃO = definido nas HUs/UCs mas nunca referenciado nos passos do fluxo.
-LACUNA = referenciado nos passos do fluxo mas sem definição correspondente.
+ÓRFÃO = definido nas HUs/UCs mas nunca referenciado nos passos.
+LACUNA = referenciado nos passos mas sem definição nas HUs/UCs.
 
-Ações para ÓRFÃO:
-1. "renomear" — o ID do órfão diverge de uma lacuna mas representam a mesma regra. novoId = ID da lacuna.
-2. "vincular" — pertence semanticamente a um passo do fluxo. Forneça ftId e passo.
-3. "remover" — é duplicado, vazio ou irrelevante.
+Ações para ÓRFÃO (campo "tipo" começa com RN, RF ou RNF):
+1. "renomear" — o órfão tem ID diferente de uma lacuna mas são a mesma regra. novoId = ID da lacuna.
+2. "vincular" — não há lacuna correspondente; o órfão pertence a um passo específico. Informe ftId e passo.
+3. "remover" — é duplicado, vazio ou obsoleto.
 
-Ações para LACUNA:
-4. "remover_ref" — a referência nos passos é inválida ou foi substituída; remove a referência dos passos.
-5. "renomear" — existe um órfão semanticamente equivalente. novoId = ID do órfão existente.
+Ações para LACUNA (campo "tipo" = "LACUNA"):
+4. "remover_ref" — a referência é inválida ou obsoleta; deve ser removida dos passos.
+5. "renomear" — existe um órfão semanticamente equivalente; novoId = ID do órfão existente.
+NUNCA use "vincular" para LACUNA.
 
-Prefira "renomear" quando órfão e lacuna representam a mesma regra com IDs diferentes.
+Prefira "renomear" quando órfão e lacuna representam a mesma regra com IDs distintos.
 Retorne SOMENTE JSON sem markdown:
 {"sugestoes":[{"rnId":"string","acao":"renomear|vincular|remover|remover_ref","novoId":"string ou null","ftId":"string ou null","passo":"string ou null","motivo":"frase curta"}]}`;
 
@@ -2260,12 +2261,30 @@ export default function AgenteRequisitos() {
   };
 
   // ── Remove referência dangling de todos os passos (lacuna sem definição) ──
+  // Remove referência de todos os passos: tanto p.refs quanto menção inline em p.descricao
   const handleRemoveLacunaRef = (refId) => {
+    const esc = refId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     setUcs(prev => prev.map(uc => ({
       ...uc,
       fluxoPrincipal: (uc.fluxoPrincipal || []).map(p => ({
         ...p,
         refs: safeRefs(p.refs).filter(r => r !== refId),
+        descricao: (p.descricao || "").replace(new RegExp(`\\s*\\(?${esc}\\)?`, "g"), "").trim(),
+      })),
+    })));
+  };
+
+  // Renomeia referência em todos os passos (lacuna → ID de órfão existente): só atualiza refs/desc,
+  // não toca a definição (que já tem o ID correto do órfão).
+  const handleRenameLacunaRef = (oldId, newId) => {
+    if (!newId || newId === oldId) return;
+    const esc = oldId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    setUcs(prev => prev.map(uc => ({
+      ...uc,
+      fluxoPrincipal: (uc.fluxoPrincipal || []).map(p => ({
+        ...p,
+        refs: safeRefs(p.refs).map(r => r === oldId ? newId : r),
+        descricao: (p.descricao || "").replace(new RegExp(esc, "g"), newId),
       })),
     })));
   };
@@ -3283,7 +3302,7 @@ export default function AgenteRequisitos() {
             </div>
 
             {/* Auditoria de Referências */}
-            <AuditPanel ucs={ucs} hus={hus} onFixRef={handleFixRef} onRemoveOrphan={handleRemoveOrphan} onRenameOrphan={handleRenameOrphan} onLinkOrphanToStep={handleLinkOrphanToStep} onRemoveOrphanFromUC={handleRemoveOrphanFromUC} onRenameOrphanInUC={handleRenameOrphanInUC} onEnrichRFRNF={handleEnrichRFRNF} enrichingRFRNF={enrichingRFRNF} onAutoVincular={handleAutoVincular} onRemoveLacunaRef={handleRemoveLacunaRef} />
+            <AuditPanel ucs={ucs} hus={hus} onFixRef={handleFixRef} onRemoveOrphan={handleRemoveOrphan} onRenameOrphan={handleRenameOrphan} onLinkOrphanToStep={handleLinkOrphanToStep} onRemoveOrphanFromUC={handleRemoveOrphanFromUC} onRenameOrphanInUC={handleRenameOrphanInUC} onEnrichRFRNF={handleEnrichRFRNF} enrichingRFRNF={enrichingRFRNF} onAutoVincular={handleAutoVincular} onRemoveLacunaRef={handleRemoveLacunaRef} onRenameLacunaRef={handleRenameLacunaRef} />
 
             {/* Barra de seleção rápida */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
@@ -4161,7 +4180,7 @@ export default function AgenteRequisitos() {
 }
 
 // ── Componente: Painel de Auditoria de Referências ───────────────
-function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLinkOrphanToStep, onRemoveOrphanFromUC, onRenameOrphanInUC, onEnrichRFRNF, enrichingRFRNF, onAutoVincular, onRemoveLacunaRef }) {
+function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLinkOrphanToStep, onRemoveOrphanFromUC, onRenameOrphanInUC, onEnrichRFRNF, enrichingRFRNF, onAutoVincular, onRemoveLacunaRef, onRenameLacunaRef }) {
   const [open, setOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [expandedOrphan, setExpandedOrphan] = useState(null);
@@ -4232,16 +4251,21 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
     const { tipo, ownerFtId } = sug;
     if (!tipo) return;
     if (sug.acao === "renomear" && sug.novoId) {
-      if (tipo === "RN")  onRenameOrphan(sug.rnId, sug.novoId);
-      if (tipo === "RF")  onRenameOrphanInUC(ownerFtId, "requisitosFuncionais",    sug.rnId, sug.novoId);
-      if (tipo === "RNF") onRenameOrphanInUC(ownerFtId, "requisitosNaoFuncionais", sug.rnId, sug.novoId);
+      // Órfão: renomeia a definição (e atualiza refs nos passos)
+      if (tipo === "RN")    onRenameOrphan(sug.rnId, sug.novoId);
+      if (tipo === "RF")    onRenameOrphanInUC(ownerFtId, "requisitosFuncionais",    sug.rnId, sug.novoId);
+      if (tipo === "RNF")   onRenameOrphanInUC(ownerFtId, "requisitosNaoFuncionais", sug.rnId, sug.novoId);
+      // Lacuna: renomeia a referência nos passos para apontar ao órfão existente
+      if (tipo === "LACUNA") onRenameLacunaRef(sug.rnId, sug.novoId);
     } else if (sug.acao === "vincular" && sug.ftId && sug.passo) {
-      onLinkOrphanToStep(sug.rnId, sug.ftId, String(sug.passo));
+      // Só faz sentido para órfãos RN — adiciona ID ao p.refs do passo indicado
+      if (tipo !== "LACUNA") onLinkOrphanToStep(sug.rnId, sug.ftId, String(sug.passo));
     } else if (sug.acao === "remover") {
       if (tipo === "RN")  onRemoveOrphan(sug.rnId);
       if (tipo === "RF")  onRemoveOrphanFromUC(ownerFtId, "requisitosFuncionais",    sug.rnId);
       if (tipo === "RNF") onRemoveOrphanFromUC(ownerFtId, "requisitosNaoFuncionais", sug.rnId);
     } else if (sug.acao === "remover_ref") {
+      // Remove de p.refs E p.descricao para não deixar lacuna em loop
       onRemoveLacunaRef(sug.rnId);
     }
     setDismissedIds(prev => new Set([...prev, sug.rnId]));
@@ -4336,7 +4360,7 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
             <div style={{ marginBottom: 16, border: `1px solid ${CI}30`, borderRadius: 7, overflow: "hidden", background: "#faf5ff" }}>
               <div style={{ padding: "8px 12px", display: "flex", alignItems: "center", gap: 8, borderBottom: `1px solid ${CI}20` }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: CI, letterSpacing: "0.06em", flex: 1 }}>
-                  SUGESTÕES DA IA — {pendingSuggestions.length} órfão{pendingSuggestions.length > 1 ? "s" : ""} analisado{pendingSuggestions.length > 1 ? "s" : ""}
+                  SUGESTÕES DA IA — {pendingSuggestions.length} item{pendingSuggestions.length > 1 ? "s" : ""} pendente{pendingSuggestions.length > 1 ? "s" : ""}
                 </span>
                 <button
                   onClick={applyAll}
