@@ -1664,20 +1664,44 @@ async function pushToWiki(org, project, pat, repoName, branch, files, commitMsg)
   // 1. Obter repo pelo nome — criar automaticamente se não existir
   let repoRes = await fetch(`${base}/${encodeURIComponent(repoName)}?api-version=7.1`, { headers });
   let created = false;
-  if (repoRes.status === 404) {
-    // Repositório não existe — criar
-    const createRes = await fetch(`${base}?api-version=7.1`, {
-      method: "POST", headers,
-      body: JSON.stringify({ name: repoName }),
-    });
-    if (!createRes.ok) {
-      const t = await createRes.text().catch(() => "");
-      throw new Error(`Não foi possível criar o repositório "${repoName}" (HTTP ${createRes.status}): ${t.slice(0, 180)}`);
+  // Fallback: GET por nome falha com espaços em algumas versões do Azure DevOps.
+  // Se 404 ou qualquer falha, tenta listar todos e achar pelo nome exato.
+  if (!repoRes.ok) {
+    const listAll = await fetch(`${base}?api-version=7.1`, { headers });
+    if (listAll.ok) {
+      const allRepos = await listAll.json();
+      const found = (allRepos.value || []).find(r => r.name === repoName);
+      if (found) {
+        repoRes = { ok: true, json: () => Promise.resolve(found) };
+      }
     }
-    repoRes = createRes;
-    created = true;
-  } else if (!repoRes.ok) {
-    throw new Error(`Erro ao acessar repositório "${repoName}" (HTTP ${repoRes.status}).`);
+  }
+
+  if (!repoRes.ok) {
+    if (repoRes.status === 404) {
+      // Repositório não existe — criar
+      const createRes = await fetch(`${base}?api-version=7.1`, {
+        method: "POST", headers,
+        body: JSON.stringify({ name: repoName }),
+      });
+      if (createRes.status === 409) {
+        // 409 = já existe mas o GET por nome não achou (encoding/timing) — lista novamente
+        const retryList = await fetch(`${base}?api-version=7.1`, { headers });
+        if (!retryList.ok) throw new Error(`Repositório "${repoName}" já existe mas não foi possível recuperá-lo.`);
+        const allRepos = await retryList.json();
+        const found = (allRepos.value || []).find(r => r.name === repoName);
+        if (!found) throw new Error(`Repositório "${repoName}" já existe mas não foi encontrado na listagem.`);
+        repoRes = { ok: true, json: () => Promise.resolve(found) };
+      } else if (!createRes.ok) {
+        const t = await createRes.text().catch(() => "");
+        throw new Error(`Não foi possível criar o repositório "${repoName}" (HTTP ${createRes.status}): ${t.slice(0, 180)}`);
+      } else {
+        repoRes = createRes;
+        created = true;
+      }
+    } else {
+      throw new Error(`Erro ao acessar repositório "${repoName}" (HTTP ${repoRes.status}).`);
+    }
   }
   const repo = await repoRes.json();
 
