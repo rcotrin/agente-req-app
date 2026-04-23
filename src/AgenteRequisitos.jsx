@@ -828,16 +828,26 @@ async function resolverOrfaosIA(orfaosInfo, lacunas, ucs) {
       .join(" | "),
   }));
 
-  const system = `Você é um analista de requisitos sênior. Para cada órfão, escolha UMA ação:
-1. "renomear" — o ID do órfão diverge de uma lacuna mas representam a mesma regra (prefixo ou número diferente). novoId = ID da lacuna.
-2. "vincular" — a regra não tem lacuna correspondente, mas pertence semanticamente a um passo do fluxo. Forneça ftId e passo.
-3. "remover" — a regra é claramente duplicada, vazia ou irrelevante.
-Prefira "renomear" quando houver lacuna com ID semanticamente próximo.
+  const system = `Você é um analista de requisitos sênior. Processe ÓRFÃOS e LACUNAS e sugira uma ação para cada item.
+
+ÓRFÃO = definido nas HUs/UCs mas nunca referenciado nos passos do fluxo.
+LACUNA = referenciado nos passos do fluxo mas sem definição correspondente.
+
+Ações para ÓRFÃO:
+1. "renomear" — o ID do órfão diverge de uma lacuna mas representam a mesma regra. novoId = ID da lacuna.
+2. "vincular" — pertence semanticamente a um passo do fluxo. Forneça ftId e passo.
+3. "remover" — é duplicado, vazio ou irrelevante.
+
+Ações para LACUNA:
+4. "remover_ref" — a referência nos passos é inválida ou foi substituída; remove a referência dos passos.
+5. "renomear" — existe um órfão semanticamente equivalente. novoId = ID do órfão existente.
+
+Prefira "renomear" quando órfão e lacuna representam a mesma regra com IDs diferentes.
 Retorne SOMENTE JSON sem markdown:
-{"sugestoes":[{"rnId":"string","acao":"renomear|vincular|remover","novoId":"string ou null","ftId":"string ou null","passo":"string ou null","motivo":"frase curta"}]}`;
+{"sugestoes":[{"rnId":"string","acao":"renomear|vincular|remover|remover_ref","novoId":"string ou null","ftId":"string ou null","passo":"string ou null","motivo":"frase curta"}]}`;
 
   const raw = await claude(
-    `ÓRFÃOS:\n${JSON.stringify(orfaosInfo, null, 2)}\n\nLACUNAS:\n${JSON.stringify(lacunasInfo, null, 2)}\n\nPASSOS DISPONÍVEIS:\n${JSON.stringify(allSteps, null, 2)}\n\nSugira a melhor ação para cada órfão.`,
+    `ÓRFÃOS:\n${JSON.stringify(orfaosInfo, null, 2)}\n\nLACUNAS (referências sem definição):\n${JSON.stringify(lacunasInfo, null, 2)}\n\nPASSOS DISPONÍVEIS:\n${JSON.stringify(allSteps, null, 2)}\n\nSugira ação para cada ÓRFÃO e cada LACUNA.`,
     system,
     4096,
     "claude-haiku-4-5-20251001"
@@ -2249,6 +2259,17 @@ export default function AgenteRequisitos() {
     })));
   };
 
+  // ── Remove referência dangling de todos os passos (lacuna sem definição) ──
+  const handleRemoveLacunaRef = (refId) => {
+    setUcs(prev => prev.map(uc => ({
+      ...uc,
+      fluxoPrincipal: (uc.fluxoPrincipal || []).map(p => ({
+        ...p,
+        refs: safeRefs(p.refs).filter(r => r !== refId),
+      })),
+    })));
+  };
+
   // ── Remove item de uc[field] (RF ou RNF) ─────────────────────────
   const handleRemoveOrphanFromUC = (ftId, field, itemId) => {
     setUcs(prev => prev.map(uc => {
@@ -3262,7 +3283,7 @@ export default function AgenteRequisitos() {
             </div>
 
             {/* Auditoria de Referências */}
-            <AuditPanel ucs={ucs} hus={hus} onFixRef={handleFixRef} onRemoveOrphan={handleRemoveOrphan} onRenameOrphan={handleRenameOrphan} onLinkOrphanToStep={handleLinkOrphanToStep} onRemoveOrphanFromUC={handleRemoveOrphanFromUC} onRenameOrphanInUC={handleRenameOrphanInUC} onEnrichRFRNF={handleEnrichRFRNF} enrichingRFRNF={enrichingRFRNF} onAutoVincular={handleAutoVincular} />
+            <AuditPanel ucs={ucs} hus={hus} onFixRef={handleFixRef} onRemoveOrphan={handleRemoveOrphan} onRenameOrphan={handleRenameOrphan} onLinkOrphanToStep={handleLinkOrphanToStep} onRemoveOrphanFromUC={handleRemoveOrphanFromUC} onRenameOrphanInUC={handleRenameOrphanInUC} onEnrichRFRNF={handleEnrichRFRNF} enrichingRFRNF={enrichingRFRNF} onAutoVincular={handleAutoVincular} onRemoveLacunaRef={handleRemoveLacunaRef} />
 
             {/* Barra de seleção rápida */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
@@ -4140,7 +4161,7 @@ export default function AgenteRequisitos() {
 }
 
 // ── Componente: Painel de Auditoria de Referências ───────────────
-function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLinkOrphanToStep, onRemoveOrphanFromUC, onRenameOrphanInUC, onEnrichRFRNF, enrichingRFRNF, onAutoVincular }) {
+function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLinkOrphanToStep, onRemoveOrphanFromUC, onRenameOrphanInUC, onEnrichRFRNF, enrichingRFRNF, onAutoVincular, onRemoveLacunaRef }) {
   const [open, setOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [expandedOrphan, setExpandedOrphan] = useState(null);
@@ -4192,11 +4213,12 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
       const allOrfaosInfo = [...orfaosRNInfo, ...orfaosRFInfo, ...orfaosRNFInfo];
       const allLacunas = [...lacunas, ...lacunasRF, ...lacunasRNF];
       const result = await resolverOrfaosIA(allOrfaosInfo, allLacunas, ucs);
-      // Enriquece cada sugestão com tipo/ownerFtId na hora da geração,
-      // para não depender de lookup no momento do clique (evita falha por estado stale).
+      // Enriquece sugestões com tipo/ownerFtId — órfãos pelo mapa, lacunas pelo ID
       const enriched = result.map(sug => {
         const info = allOrfaosInfo.find(o => o.id === sug.rnId);
-        return { ...sug, tipo: info?.tipo || null, ownerFtId: info?.ownerFtId || null };
+        const isLacuna = !info && allLacunas.some(l => l.id === sug.rnId);
+        const tipo = info?.tipo || (isLacuna ? "LACUNA" : null);
+        return { ...sug, tipo, ownerFtId: info?.ownerFtId || null };
       });
       setSuggestions(enriched);
     } catch (e) {
@@ -4219,6 +4241,8 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
       if (tipo === "RN")  onRemoveOrphan(sug.rnId);
       if (tipo === "RF")  onRemoveOrphanFromUC(ownerFtId, "requisitosFuncionais",    sug.rnId);
       if (tipo === "RNF") onRemoveOrphanFromUC(ownerFtId, "requisitosNaoFuncionais", sug.rnId);
+    } else if (sug.acao === "remover_ref") {
+      onRemoveLacunaRef(sug.rnId);
     }
     setDismissedIds(prev => new Set([...prev, sug.rnId]));
   };
@@ -4229,7 +4253,7 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
   };
 
   const pendingSuggestions = suggestions.filter(s => !dismissedIds.has(s.rnId));
-  const acaoBadge = { renomear: { label: "renomear", bg: "#fef3c7", color: "#92400e" }, vincular: { label: "vincular", bg: "#ede9fe", color: "#6d28d9" }, remover: { label: "remover", bg: "#fee2e2", color: "#991b1b" } };
+  const acaoBadge = { renomear: { label: "renomear", bg: "#fef3c7", color: "#92400e" }, vincular: { label: "vincular", bg: "#ede9fe", color: "#6d28d9" }, remover: { label: "remover", bg: "#fee2e2", color: "#991b1b" }, remover_ref: { label: "remover ref", bg: "#fde8d8", color: "#9a3412" } };
 
   return (
     <div style={{ marginBottom: 16, border: `1px solid ${borderColor}`, borderRadius: 8, overflow: "hidden", background: bg }}>
