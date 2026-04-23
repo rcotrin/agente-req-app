@@ -4234,10 +4234,10 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
           <span style={{ fontSize: 9, color: "#94a3b8" }}>{open ? "▲" : "▼"}</span>
         </div>
         {/* Botão Auto-vincular — vincula RNs com origemPasso sem IA */}
-        {totalOrfaos > 0 && (
+        {ucs.length > 0 && (
           <button
             onClick={() => { onAutoVincular(); if (!open) setOpen(true); }}
-            title="Vincula automaticamente RNs que possuem origemPasso preenchido — sem IA"
+            title={totalOrfaos > 0 ? "Vincula automaticamente RNs com origemPasso preenchido — sem IA" : "Re-executar auto-vinculação via origemPasso"}
             style={{
               fontSize: 10, padding: "4px 12px", borderRadius: 5, flexShrink: 0,
               border: "1px solid #0369a1", color: "#0369a1",
@@ -4246,12 +4246,12 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
             ⚡ Auto-vincular
           </button>
         )}
-        {/* Botão Resolver Órfãos com IA — visível quando há órfãos */}
-        {totalOrfaos > 0 && (
+        {/* Botão Resolver Órfãos com IA — visível quando há UCs */}
+        {ucs.length > 0 && (
           <button
             onClick={() => { if (!open) setOpen(true); handleResolverOrfaos(); }}
             disabled={resolving}
-            title="Usar IA para sugerir vinculação dos órfãos sem origemPasso"
+            title={totalOrfaos > 0 ? "Usar IA para sugerir vinculação dos órfãos sem origemPasso" : "Re-executar análise de órfãos com IA"}
             style={{
               fontSize: 10, padding: "4px 12px", borderRadius: 5, flexShrink: 0,
               border: `1px solid ${CI}`, color: resolving ? "#94a3b8" : CI,
