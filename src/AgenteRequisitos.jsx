@@ -810,6 +810,37 @@ Retorne SOMENTE JSON sem markdown:
 }
 
 // ════════════════════════════════════════════════════════════════════
+// AUTO-VINCULAR POR origemPasso
+// Popula p.refs com RNs cujo origemPasso aponta para aquele passo.
+// Determinístico, sem IA — usa dados já presentes no modelo.
+// ════════════════════════════════════════════════════════════════════
+
+function autoVincularPorOrigemPasso(ucs, hus) {
+  return ucs.map(uc => {
+    const husDoUC = hus.filter(h => h.ftId === uc.ftId || h.ucId === uc.ucId);
+    // Monta mapa passoNorm → Set de RN IDs via origemPasso
+    const refsByPasso = {};
+    husDoUC.forEach(hu => {
+      (hu.regrasNegocio || []).forEach(rn => {
+        if (!rn.id || !rn.origemPasso) return;
+        const key = normalizePasso(rn.origemPasso);
+        if (!key) return;
+        if (!refsByPasso[key]) refsByPasso[key] = new Set();
+        refsByPasso[key].add(rn.id);
+      });
+    });
+    if (!Object.keys(refsByPasso).length) return uc;
+    const updatedFP = (uc.fluxoPrincipal || []).map(p => {
+      const key = normalizePasso(p.passo);
+      if (!key || !refsByPasso[key]) return p;
+      const merged = new Set([...safeRefs(p.refs), ...refsByPasso[key]]);
+      return { ...p, refs: [...merged] };
+    });
+    return { ...uc, fluxoPrincipal: updatedFP };
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
 // AUDITORIA DE REFERÊNCIAS
 // Detecta lacunas (RN citadas nos passos mas não definidas nas HUs)
 // e órfãos (RN definidas nas HUs mas nunca citadas nos passos).
@@ -857,6 +888,26 @@ function auditarReferencias(ucs, hus) {
       ((p.descricao || "").match(RN_PATTERN)  || []).forEach(id => addRef(referenciados,   id, { ...occ, fonte: "inline" }));
       ((p.descricao || "").match(RF_PATTERN)  || []).forEach(id => addRef(referenciadosRF,  id, { ...occ, fonte: "inline" }));
       ((p.descricao || "").match(RNF_PATTERN) || []).forEach(id => addRef(referenciadosRNF, id, { ...occ, fonte: "inline" }));
+    });
+  });
+
+  // ── Referências implícitas via origemPasso nas RNs das HUs ───────
+  // RNs com origemPasso preenchido já estão mapeadas — não são órfãs reais.
+  // Alinha a auditoria com a lógica do wikiUCFile que já usa origemPasso.
+  hus.forEach(hu => {
+    const uc = ucs.find(u => u.ftId === hu.ftId || u.ucId === hu.ucId);
+    if (!uc) return;
+    (hu.regrasNegocio || []).forEach(rn => {
+      if (!rn.id || !rn.origemPasso) return;
+      const passoNorm = normalizePasso(rn.origemPasso);
+      if (!passoNorm) return;
+      const step = (uc.fluxoPrincipal || []).find(p => normalizePasso(p.passo) === passoNorm);
+      const occ = {
+        ftId: uc.ftId, ucTitulo: uc.titulo,
+        passo: step?.passo || rn.origemPasso, descricao: step?.descricao || "",
+        fonte: "origemPasso",
+      };
+      addRef(referenciados, rn.id, occ);
     });
   });
 
@@ -2153,6 +2204,11 @@ export default function AgenteRequisitos() {
     }));
   };
 
+  // ── Reconcilia refs via origemPasso (sem IA) ─────────────────────
+  const handleAutoVincular = () => {
+    setUcs(prev => autoVincularPorOrigemPasso(prev, hus));
+  };
+
   // ── Enriquece RF/RNF sem reprocessar o pipeline ──────────────────
   const [enrichingRFRNF, setEnrichingRFRNF] = useState(false);
   const handleEnrichRFRNF = async () => {
@@ -3121,7 +3177,7 @@ export default function AgenteRequisitos() {
             </div>
 
             {/* Auditoria de Referências */}
-            <AuditPanel ucs={ucs} hus={hus} onFixRef={handleFixRef} onRemoveOrphan={handleRemoveOrphan} onRenameOrphan={handleRenameOrphan} onLinkOrphanToStep={handleLinkOrphanToStep} onRemoveOrphanFromUC={handleRemoveOrphanFromUC} onRenameOrphanInUC={handleRenameOrphanInUC} onEnrichRFRNF={handleEnrichRFRNF} enrichingRFRNF={enrichingRFRNF} />
+            <AuditPanel ucs={ucs} hus={hus} onFixRef={handleFixRef} onRemoveOrphan={handleRemoveOrphan} onRenameOrphan={handleRenameOrphan} onLinkOrphanToStep={handleLinkOrphanToStep} onRemoveOrphanFromUC={handleRemoveOrphanFromUC} onRenameOrphanInUC={handleRenameOrphanInUC} onEnrichRFRNF={handleEnrichRFRNF} enrichingRFRNF={enrichingRFRNF} onAutoVincular={handleAutoVincular} />
 
             {/* Barra de seleção rápida */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
@@ -3999,7 +4055,7 @@ export default function AgenteRequisitos() {
 }
 
 // ── Componente: Painel de Auditoria de Referências ───────────────
-function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLinkOrphanToStep, onRemoveOrphanFromUC, onRenameOrphanInUC, onEnrichRFRNF, enrichingRFRNF }) {
+function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLinkOrphanToStep, onRemoveOrphanFromUC, onRenameOrphanInUC, onEnrichRFRNF, enrichingRFRNF, onAutoVincular }) {
   const [open, setOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [expandedOrphan, setExpandedOrphan] = useState(null);
@@ -4112,12 +4168,25 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
           )}
           <span style={{ fontSize: 9, color: "#94a3b8" }}>{open ? "▲" : "▼"}</span>
         </div>
+        {/* Botão Auto-vincular — vincula RNs com origemPasso sem IA */}
+        {totalOrfaos > 0 && (
+          <button
+            onClick={() => { onAutoVincular(); if (!open) setOpen(true); }}
+            title="Vincula automaticamente RNs que possuem origemPasso preenchido — sem IA"
+            style={{
+              fontSize: 10, padding: "4px 12px", borderRadius: 5, flexShrink: 0,
+              border: "1px solid #0369a1", color: "#0369a1",
+              background: "#f0f9ff", cursor: "pointer", fontWeight: 600,
+            }}>
+            ⚡ Auto-vincular
+          </button>
+        )}
         {/* Botão Resolver Órfãos com IA — visível quando há órfãos */}
         {totalOrfaos > 0 && (
           <button
             onClick={() => { if (!open) setOpen(true); handleResolverOrfaos(); }}
             disabled={resolving}
-            title="Usar IA para sugerir vinculação automática de todos os órfãos"
+            title="Usar IA para sugerir vinculação dos órfãos sem origemPasso"
             style={{
               fontSize: 10, padding: "4px 12px", borderRadius: 5, flexShrink: 0,
               border: `1px solid ${CI}`, color: resolving ? "#94a3b8" : CI,
