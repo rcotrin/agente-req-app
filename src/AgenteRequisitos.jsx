@@ -4182,9 +4182,14 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
   const [resolveError, setResolveError] = useState("");
   const [dismissedIds, setDismissedIds] = useState(new Set());
   const audit = useMemo(() => auditarReferencias(ucs, hus), [ucs, hus]);
-  const { lacunas, orfaos, definidos,
-          lacunasRF, orfaosRF, definidosRF, rfByUC,
-          lacunasRNF, orfaosRNF, definidosRNF, rnfByUC } = audit;
+  const { lacunas: lacunasRaw, orfaos: orfaosRaw, definidos,
+          lacunasRF: lacunasRFRaw, orfaosRF, definidosRF, rfByUC,
+          lacunasRNF: lacunasRNFRaw, orfaosRNF, definidosRNF, rnfByUC } = audit;
+  // Filtra itens já aplicados via Resolver com IA para remoção imediata da interface
+  const lacunas    = lacunasRaw.filter(l => !dismissedIds.has(l.id));
+  const lacunasRF  = lacunasRFRaw.filter(l => !dismissedIds.has(l.id));
+  const lacunasRNF = lacunasRNFRaw.filter(l => !dismissedIds.has(l.id));
+  const orfaos     = orfaosRaw.filter(id => !dismissedIds.has(id));
   const total = lacunas.length + orfaos.length + lacunasRF.length + orfaosRF.length + lacunasRNF.length + orfaosRNF.length;
   const totalOrfaos = orfaos.length + orfaosRF.length + orfaosRNF.length;
 
