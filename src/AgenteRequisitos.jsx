@@ -425,8 +425,6 @@ async function enrichRFRNF(hus, ucs, epicos = []) {
     const epicTitle = epico?.titulo || epicUCs[0]?.titulo || epicId;
     const allHus    = hus.filter(h => epicUCs.some(u => u.ftId === h.ftId || u.ucId === h.ucId));
 
-    // Limpa antes — garante estado consistente mesmo em caso de falha
-    epicUCs.forEach(uc => { uc.requisitosFuncionais = []; uc.requisitosNaoFuncionais = []; });
     if (!allHus.length) continue;
 
     const prefix = ucToRNPrefix(epicTitle);
@@ -474,11 +472,14 @@ Retorne SOMENTE JSON sem markdown:
         `Épico: ${epicId} — ${epicTitle}\n\nCasos de Uso:\n${JSON.stringify(ucsCompact, null, 2)}\n\nHUs:\n${JSON.stringify(husCompact, null, 2)}`,
         system, 3000, "claude-haiku-4-5-20251001"
       );
-      const parsed = safeJSON(raw);
+      const parsed = safeJSON(raw) || recoverPartialJSON(raw);
       if (!parsed) { console.warn(`[enrichRFRNF] épico ${epicId}: JSON inválido`); continue; }
 
       const rfs  = (parsed.rf  || []).filter(r => r.id && r.descricao);
       const rnfs = (parsed.rnf || []).filter(r => r.id && r.descricao);
+
+      // Só limpa quando temos dados válidos para substituir
+      epicUCs.forEach(uc => { uc.requisitosFuncionais = []; uc.requisitosNaoFuncionais = []; });
 
       // Distribui cada RF para o UC primário (primeiro em ucRefs)
       rfs.forEach(rf => {
@@ -952,6 +953,26 @@ function auditarReferencias(ucs, hus) {
   const mkOrfaos = (defs, refs) =>
     [...defs].filter(id => !refs.has(id)).sort();
 
+  // RF órfão: ucRefs vazio ou aponta apenas para ftIds inexistentes
+  // RFs são capacidades do sistema — linkagem via ucRefs, não via p.refs
+  const validFtIds = new Set(ucs.map(u => u.ftId));
+  const rfItemMap  = new Map();
+  ucs.forEach(uc => (uc.requisitosFuncionais || []).forEach(r => { if (r.id) rfItemMap.set(r.id, r); }));
+  const orfaosRF = [...definidosRF].filter(id => {
+    const rf   = rfItemMap.get(id);
+    const refs = rf?.ucRefs || [];
+    return refs.length === 0 || !refs.some(ref => validFtIds.has(ref));
+  }).sort();
+
+  // RNF não tem ucRefs — é épico-wide e já está dentro de uma UC por definição
+  // Considera órfão apenas se o objeto não tiver descrição (incompleto)
+  const rnfItemMap = new Map();
+  ucs.forEach(uc => (uc.requisitosNaoFuncionais || []).forEach(r => { if (r.id) rnfItemMap.set(r.id, r); }));
+  const orfaosRNF = [...definidosRNF].filter(id => {
+    const rnf = rnfItemMap.get(id);
+    return !rnf?.descricao;
+  }).sort();
+
   return {
     // RN
     definidos, referenciados,
@@ -960,11 +981,11 @@ function auditarReferencias(ucs, hus) {
     // RF
     definidosRF, rfByUC, referenciadosRF,
     lacunasRF:  mkLacunas(referenciadosRF,  definidosRF),
-    orfaosRF:   mkOrfaos(definidosRF,       referenciadosRF),
+    orfaosRF,
     // RNF
     definidosRNF, rnfByUC, referenciadosRNF,
     lacunasRNF:  mkLacunas(referenciadosRNF, definidosRNF),
-    orfaosRNF:   mkOrfaos(definidosRNF,      referenciadosRNF),
+    orfaosRNF,
   };
 }
 
