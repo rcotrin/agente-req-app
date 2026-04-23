@@ -769,6 +769,47 @@ function safeRefs(refs) {
 }
 
 // ════════════════════════════════════════════════════════════════════
+// RESOLVER ÓRFÃOS COM IA
+// Recebe todos os órfãos (RN/RF/RNF), lacunas e passos disponíveis.
+// Retorna sugestões em lote: renomear, vincular ou remover.
+// ════════════════════════════════════════════════════════════════════
+
+async function resolverOrfaosIA(orfaosInfo, lacunas, ucs) {
+  const allSteps = ucs.flatMap(uc =>
+    (uc.fluxoPrincipal || []).map(p => ({
+      ftId: uc.ftId,
+      ucTitulo: (uc.titulo || "").slice(0, 40),
+      passo: p.passo,
+      descricao: (p.descricao || "").slice(0, 120),
+    }))
+  ).slice(0, 100);
+
+  const lacunasInfo = lacunas.map(l => ({
+    id: l.id,
+    contexto: (l.ocorrencias || [])
+      .map(o => `${o.ftId} FP-${o.passo}: ${(o.descricao || "").slice(0, 80)}`)
+      .join(" | "),
+  }));
+
+  const system = `Você é um analista de requisitos sênior. Para cada órfão, escolha UMA ação:
+1. "renomear" — o ID do órfão diverge de uma lacuna mas representam a mesma regra (prefixo ou número diferente). novoId = ID da lacuna.
+2. "vincular" — a regra não tem lacuna correspondente, mas pertence semanticamente a um passo do fluxo. Forneça ftId e passo.
+3. "remover" — a regra é claramente duplicada, vazia ou irrelevante.
+Prefira "renomear" quando houver lacuna com ID semanticamente próximo.
+Retorne SOMENTE JSON sem markdown:
+{"sugestoes":[{"rnId":"string","acao":"renomear|vincular|remover","novoId":"string ou null","ftId":"string ou null","passo":"string ou null","motivo":"frase curta"}]}`;
+
+  const raw = await claude(
+    `ÓRFÃOS:\n${JSON.stringify(orfaosInfo, null, 2)}\n\nLACUNAS:\n${JSON.stringify(lacunasInfo, null, 2)}\n\nPASSOS DISPONÍVEIS:\n${JSON.stringify(allSteps, null, 2)}\n\nSugira a melhor ação para cada órfão.`,
+    system,
+    2500,
+    "claude-haiku-4-5-20251001"
+  );
+
+  return safeJSON(raw)?.sugestoes || [];
+}
+
+// ════════════════════════════════════════════════════════════════════
 // AUDITORIA DE REFERÊNCIAS
 // Detecta lacunas (RN citadas nos passos mas não definidas nas HUs)
 // e órfãos (RN definidas nas HUs mas nunca citadas nos passos).
@@ -3964,15 +4005,21 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
   const [expandedOrphan, setExpandedOrphan] = useState(null);
   const [orphanNewId, setOrphanNewId] = useState("");
   const [linkStep, setLinkStep] = useState("");   // "ftId|||passo"
+  const [suggestions, setSuggestions] = useState([]);
+  const [resolving, setResolving] = useState(false);
+  const [resolveError, setResolveError] = useState("");
+  const [dismissedIds, setDismissedIds] = useState(new Set());
   const audit = useMemo(() => auditarReferencias(ucs, hus), [ucs, hus]);
   const { lacunas, orfaos, definidos,
           lacunasRF, orfaosRF, definidosRF, rfByUC,
           lacunasRNF, orfaosRNF, definidosRNF, rnfByUC } = audit;
   const total = lacunas.length + orfaos.length + lacunasRF.length + orfaosRF.length + lacunasRNF.length + orfaosRNF.length;
+  const totalOrfaos = orfaos.length + orfaosRF.length + orfaosRNF.length;
 
   const CR = "#991b1b";   // vermelho — lacunas
   const CA = "#92400e";   // âmbar   — órfãos
   const CG = "#166534";   // verde   — tudo OK
+  const CI = "#6d28d9";   // índigo  — IA
 
   const borderColor = lacunas.length ? CR + "40" : orfaos.length ? CA + "40" : CG + "30";
   const bg          = lacunas.length ? "#fff5f5" : orfaos.length ? "#fffbf0" : "#f0faf4";
@@ -3980,6 +4027,67 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
   const semRFGlobal  = ucs.every(u => !(u.requisitosFuncionais    || []).length);
   const semRNFGlobal = ucs.every(u => !(u.requisitosNaoFuncionais || []).length);
   const showEnrichBtn = semRFGlobal || semRNFGlobal;
+
+  const handleResolverOrfaos = async () => {
+    if (resolving) return;
+    setResolving(true);
+    setResolveError("");
+    setSuggestions([]);
+    setDismissedIds(new Set());
+    try {
+      const orfaosRNInfo = orfaos.map(id => {
+        const rn = hus.flatMap(h => h.regrasNegocio || []).find(r => r.id === id);
+        return { id, nome: rn?.nome || "", descricao: rn?.descricao || "", tipo: "RN" };
+      });
+      const orfaosRFInfo = orfaosRF.map(id => {
+        const item = ucs.flatMap(u => u.requisitosFuncionais || []).find(r => r.id === id);
+        return { id, descricao: item?.descricao || "", tipo: "RF", ownerFtId: rfByUC.get(id) };
+      });
+      const orfaosRNFInfo = orfaosRNF.map(id => {
+        const item = ucs.flatMap(u => u.requisitosNaoFuncionais || []).find(r => r.id === id);
+        return { id, descricao: item?.descricao || "", tipo: "RNF", ownerFtId: rnfByUC.get(id) };
+      });
+      const allLacunas = [...lacunas, ...lacunasRF, ...lacunasRNF];
+      const result = await resolverOrfaosIA([...orfaosRNInfo, ...orfaosRFInfo, ...orfaosRNFInfo], allLacunas, ucs);
+      setSuggestions(result);
+    } catch (e) {
+      setResolveError(e.message);
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  const getOrfaoInfo = (rnId) => {
+    if (orfaos.includes(rnId))   return { tipo: "RN" };
+    if (orfaosRF.includes(rnId)) return { tipo: "RF",  ownerFtId: rfByUC.get(rnId) };
+    if (orfaosRNF.includes(rnId))return { tipo: "RNF", ownerFtId: rnfByUC.get(rnId) };
+    return null;
+  };
+
+  const applySuggestion = (sug) => {
+    const info = getOrfaoInfo(sug.rnId);
+    if (!info) return;
+    if (sug.acao === "renomear" && sug.novoId) {
+      if (info.tipo === "RN")  onRenameOrphan(sug.rnId, sug.novoId);
+      if (info.tipo === "RF")  onRenameOrphanInUC(info.ownerFtId, "requisitosFuncionais",    sug.rnId, sug.novoId);
+      if (info.tipo === "RNF") onRenameOrphanInUC(info.ownerFtId, "requisitosNaoFuncionais", sug.rnId, sug.novoId);
+    } else if (sug.acao === "vincular" && sug.ftId && sug.passo) {
+      onLinkOrphanToStep(sug.rnId, sug.ftId, sug.passo);
+    } else if (sug.acao === "remover") {
+      if (info.tipo === "RN")  onRemoveOrphan(sug.rnId);
+      if (info.tipo === "RF")  onRemoveOrphanFromUC(info.ownerFtId, "requisitosFuncionais",    sug.rnId);
+      if (info.tipo === "RNF") onRemoveOrphanFromUC(info.ownerFtId, "requisitosNaoFuncionais", sug.rnId);
+    }
+    setDismissedIds(prev => new Set([...prev, sug.rnId]));
+  };
+
+  const applyAll = () => {
+    suggestions.filter(s => !dismissedIds.has(s.rnId)).forEach(applySuggestion);
+    setSuggestions([]);
+  };
+
+  const pendingSuggestions = suggestions.filter(s => !dismissedIds.has(s.rnId));
+  const acaoBadge = { renomear: { label: "renomear", bg: "#fef3c7", color: "#92400e" }, vincular: { label: "vincular", bg: "#ede9fe", color: "#6d28d9" }, remover: { label: "remover", bg: "#fee2e2", color: "#991b1b" } };
 
   return (
     <div style={{ marginBottom: 16, border: `1px solid ${borderColor}`, borderRadius: 8, overflow: "hidden", background: bg }}>
@@ -4004,6 +4112,21 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
           )}
           <span style={{ fontSize: 9, color: "#94a3b8" }}>{open ? "▲" : "▼"}</span>
         </div>
+        {/* Botão Resolver Órfãos com IA — visível quando há órfãos */}
+        {totalOrfaos > 0 && (
+          <button
+            onClick={() => { if (!open) setOpen(true); handleResolverOrfaos(); }}
+            disabled={resolving}
+            title="Usar IA para sugerir vinculação automática de todos os órfãos"
+            style={{
+              fontSize: 10, padding: "4px 12px", borderRadius: 5, flexShrink: 0,
+              border: `1px solid ${CI}`, color: resolving ? "#94a3b8" : CI,
+              background: resolving ? "#f1f5f9" : "#f5f3ff",
+              cursor: resolving ? "not-allowed" : "pointer", fontWeight: 600,
+            }}>
+            {resolving ? "⏳ Analisando…" : "✦ Resolver com IA"}
+          </button>
+        )}
         {/* Botão RF/RNF — visível mesmo com o painel fechado */}
         {showEnrichBtn && (
           <button
@@ -4023,6 +4146,64 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
 
       {open && (
         <div style={{ borderTop: "1px solid #e2e8f0", padding: "12px 14px" }}>
+
+          {/* ── Sugestões da IA ── */}
+          {resolveError && (
+            <div style={{ fontSize: 11, color: CR, background: "#fff5f5", border: `1px solid ${CR}30`, borderRadius: 6, padding: "8px 12px", marginBottom: 12 }}>
+              Erro ao consultar IA: {resolveError}
+            </div>
+          )}
+          {pendingSuggestions.length > 0 && (
+            <div style={{ marginBottom: 16, border: `1px solid ${CI}30`, borderRadius: 7, overflow: "hidden", background: "#faf5ff" }}>
+              <div style={{ padding: "8px 12px", display: "flex", alignItems: "center", gap: 8, borderBottom: `1px solid ${CI}20` }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: CI, letterSpacing: "0.06em", flex: 1 }}>
+                  SUGESTÕES DA IA — {pendingSuggestions.length} órfão{pendingSuggestions.length > 1 ? "s" : ""} analisado{pendingSuggestions.length > 1 ? "s" : ""}
+                </span>
+                <button
+                  onClick={applyAll}
+                  style={{ fontSize: 10, padding: "4px 14px", borderRadius: 4, border: `1px solid ${CI}60`, color: CI, background: "#ede9fe", cursor: "pointer", fontWeight: 600, flexShrink: 0 }}>
+                  Aplicar Todos
+                </button>
+                <button
+                  onClick={() => setSuggestions([])}
+                  style={{ fontSize: 10, padding: "4px 10px", borderRadius: 4, border: "1px solid #cbd5e1", color: "#64748b", background: "transparent", cursor: "pointer", flexShrink: 0 }}>
+                  Descartar
+                </button>
+              </div>
+              {pendingSuggestions.map(sug => {
+                const badge = acaoBadge[sug.acao] || acaoBadge.remover;
+                return (
+                  <div key={sug.rnId} style={{ padding: "8px 12px", borderBottom: `1px solid ${CI}10`, display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 3 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: CA, fontFamily: "monospace" }}>{sug.rnId}</span>
+                        <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 10, background: badge.bg, color: badge.color, letterSpacing: "0.05em" }}>{badge.label}</span>
+                        {sug.acao === "renomear" && sug.novoId && (
+                          <span style={{ fontSize: 10, color: "#166534", fontFamily: "monospace" }}>→ {sug.novoId}</span>
+                        )}
+                        {sug.acao === "vincular" && sug.ftId && (
+                          <span style={{ fontSize: 10, color: CI, fontFamily: "monospace" }}>→ {sug.ftId} FP-{sug.passo}</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 10, color: "#64748b" }}>{sug.motivo}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
+                      <button
+                        onClick={() => applySuggestion(sug)}
+                        style={{ fontSize: 10, padding: "3px 10px", borderRadius: 4, border: `1px solid ${CI}50`, color: CI, background: "#ede9fe", cursor: "pointer", fontWeight: 600 }}>
+                        Aplicar
+                      </button>
+                      <button
+                        onClick={() => setDismissedIds(prev => new Set([...prev, sug.rnId]))}
+                        style={{ fontSize: 10, padding: "3px 8px", borderRadius: 4, border: "1px solid #cbd5e1", color: "#94a3b8", background: "transparent", cursor: "pointer" }}>
+                        Ignorar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* ── Lacunas ── */}
           {lacunas.length > 0 && (
