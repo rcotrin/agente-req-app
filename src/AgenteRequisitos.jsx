@@ -431,20 +431,32 @@ async function enrichRFRNF(hus, ucs, epicos = []) {
 
     const prefix = ucToRNPrefix(epicTitle);
     const system = `Você é um Analista de Requisitos sênior (ISO 29148 / UML 2.5.1).
-Analise TODOS os Casos de Uso do Épico e gere Requisitos Funcionais CONSOLIDADOS.
+Analise TODOS os Casos de Uso do Épico e gere Requisitos Funcionais no nível de CAPACIDADE DO SISTEMA.
 
 REGRAS OBRIGATÓRIAS:
-1. CONSOLIDAÇÃO — se 2 ou mais UCs exigem o mesmo comportamento (autenticação, auditoria, validação comum), gere UM ÚNICO RF que cobre todos. NUNCA repita o mesmo comportamento em RFs diferentes.
-2. NÍVEL CORRETO — RF descreve CAPACIDADE DO SISTEMA, não detalhe de passo.
-   CORRETO: "O sistema deve autenticar o usuário antes de qualquer operação sensível."
-   ERRADO:  "O sistema deve verificar login no passo FP-1 do FT001."
-3. QUANTIDADE — máx 10 RF por épico. Prefira 5–8 bem consolidados a 10 fragmentados.
-4. "ucRefs" — lista dos ftIds que este RF atende (obrigatório). Se atende a todos os UCs, liste todos.
-5. descricao — sentença declarativa modal: "O sistema deve [verbo] [objeto] [restrição]."
-6. origemPasso — passo FP do UC principal onde o comportamento ocorre (ex: "FP-2"). Use "" se transversal a vários passos.
-7. prioridade — "Alta" | "Média" | "Baixa"
-8. verificacao — como confirmar o RF (referência a CT ou critério de aceite).
-9. RNF — máx 4 por épico, somente os mais críticos e mensuráveis. Não repita RNFs genéricos.
+1. NÍVEL CAPACIDADE — RF descreve o que o sistema é capaz de fazer, independente de qual UC usa essa capacidade.
+   CORRETO: "O sistema deve classificar registros de conciliação por categoria de divergência (duplicado, parcial, sem correspondência) com base em regras parametrizáveis."
+   ERRADO:  "O sistema deve listar registros divergentes do lote selecionado." ← paráfrase do UC, proibido.
+   TESTE: se remover o RF e o UC ainda descrever o mesmo comportamento nos seus passos, o RF estava errado.
+
+2. PROIBIDO — não gere RF que seja paráfrase do título, objetivo ou fluxo de um único UC. Se o RF só faz sentido para um UC, ele não é um RF — é parte do UC.
+
+3. PRIORIDADE TRANSVERSAL — prefira RFs que atendem 2 ou mais UCs. Um RF com ucRefs: ["FT002","FT005","FT007"] vale mais que três RFs de um UC cada.
+
+4. QUANTIDADE — entre 3 e 8 RF por épico. Menos RFs de melhor qualidade é preferível a mais RFs granulares.
+
+5. "ucRefs" — lista dos ftIds que este RF atende (obrigatório). RF transversal lista todos os UCs beneficiados.
+
+6. descricao — sentença declarativa modal: "O sistema deve [capacidade] [restrição/condição]."
+
+7. origemPasso — passo FP do UC principal onde a capacidade é exercida. Use "" se transversal a múltiplos passos.
+
+8. prioridade — "Alta" | "Média" | "Baixa"
+
+9. verificacao — como confirmar que a capacidade está implementada (teste de integração, critério mensurável).
+
+10. RNF — entre 2 e 4 por épico. Somente restrições de qualidade mensuráveis e críticas. Não repita RNFs genéricos entre épicos.
+
 Retorne SOMENTE JSON sem markdown:
 {"rf":[{"id":"RF-${prefix}-001","descricao":"string","ucRefs":["FT001","FT002"],"origemPasso":"FP-2","prioridade":"Alta","verificacao":"string"}],"rnf":[{"id":"RNF-${prefix}-001","categoria":"Performance Efficiency","descricao":"string","metrica":"string","prioridade":"Alta"}]}`;
 
