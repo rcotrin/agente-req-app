@@ -409,53 +409,77 @@ Retorne SOMENTE JSON sem markdown: {"rns":[{"id":"RN001","nome":"Nome Semantico"
 // Retorna ucs[] atualizados com requisitosFuncionais e requisitosNaoFuncionais.
 // ════════════════════════════════════════════════════════════════════
 
-async function enrichRFRNF(hus, ucs) {
+async function enrichRFRNF(hus, ucs, epicos = []) {
   const updated = ucs.map(uc => ({ ...uc }));
 
-  for (const uc of updated) {
-    const husUC = hus.filter(h => h.ucId === uc.ucId);
-    if (!husUC.length) { uc.requisitosFuncionais = []; uc.requisitosNaoFuncionais = []; continue; }
+  // Agrupa UCs por épico para geração consolidada
+  const epicGroups = new Map();
+  updated.forEach(uc => {
+    const key = uc.epicId || "__none__";
+    if (!epicGroups.has(key)) epicGroups.set(key, []);
+    epicGroups.get(key).push(uc);
+  });
 
-    const prefix = ucToRNPrefix(uc.titulo);
-    const system = `Você é um Analista de Requisitos. Com base no Caso de Uso e HUs abaixo, extraia:
-1. REQUISITOS FUNCIONAIS (RF): comportamentos específicos que o sistema deve implementar, derivados dos critérios de aceite e regras de negócio. IDs: "RF-${prefix}-001", "RF-${prefix}-002"...
-2. REQUISITOS NÃO FUNCIONAIS (RNF): restrições de qualidade conforme ISO/IEC 25010. IDs: "RNF-${prefix}-001"...
-REGRAS:
-- Máx 5 RF e 4 RNF por UC. Se não houver conteúdo suficiente, retorne arrays vazios [].
-- descricao RF: sentença declarativa modal — "O sistema deve [verbo] [complemento]." Ex: "O sistema deve validar o saldo disponível antes de autorizar a transação.", "O sistema deve registrar log de auditoria para cada operação realizada." ERRADO: iniciar com verbo no infinitivo sem sujeito.
-- origemPasso: passo do FP relacionado (ex: "FP-2"). Use "" se não aplicável.
-- prioridade RF: "Alta" se requisito é crítico para funcionamento do UC principal, "Média" se é importante mas não bloqueante, "Baixa" se é complementar.
-- verificacao RF: como confirmar que o requisito foi atendido — referencie o CT ou critério (ex: "Verificado por CT-FT001-02" ou "Confirmado via teste de integração da API de autorização").
-- categoria RNF: uma de "Performance Efficiency" | "Security" | "Reliability" | "Usability" | "Compatibility" | "Maintainability" | "Portability" | "Functional Suitability" — conforme ISO/IEC 25010:2011.
-- descricao RNF: sentença declarativa modal — "O sistema deve [verbo] [complemento]." Ex: "O sistema deve processar a requisição em até 500ms sob carga de 200 usuários simultâneos."
-- metrica RNF: valor mensurável quando disponível (ex: "<= 500ms"), caso contrário "A definir".
-- prioridade RNF: "Alta" se requisito é crítico para funcionamento do UC principal, "Média" se é importante mas não bloqueante, "Baixa" se é complementar.
+  for (const [epicId, epicUCs] of epicGroups) {
+    const epico     = epicos.find(e => e.id === epicId);
+    const epicTitle = epico?.titulo || epicUCs[0]?.titulo || epicId;
+    const allHus    = hus.filter(h => epicUCs.some(u => u.ftId === h.ftId || u.ucId === h.ucId));
+
+    // Limpa antes — garante estado consistente mesmo em caso de falha
+    epicUCs.forEach(uc => { uc.requisitosFuncionais = []; uc.requisitosNaoFuncionais = []; });
+    if (!allHus.length) continue;
+
+    const prefix = ucToRNPrefix(epicTitle);
+    const system = `Você é um Analista de Requisitos sênior (ISO 29148 / UML 2.5.1).
+Analise TODOS os Casos de Uso do Épico e gere Requisitos Funcionais CONSOLIDADOS.
+
+REGRAS OBRIGATÓRIAS:
+1. CONSOLIDAÇÃO — se 2 ou mais UCs exigem o mesmo comportamento (autenticação, auditoria, validação comum), gere UM ÚNICO RF que cobre todos. NUNCA repita o mesmo comportamento em RFs diferentes.
+2. NÍVEL CORRETO — RF descreve CAPACIDADE DO SISTEMA, não detalhe de passo.
+   CORRETO: "O sistema deve autenticar o usuário antes de qualquer operação sensível."
+   ERRADO:  "O sistema deve verificar login no passo FP-1 do FT001."
+3. QUANTIDADE — máx 10 RF por épico. Prefira 5–8 bem consolidados a 10 fragmentados.
+4. "ucRefs" — lista dos ftIds que este RF atende (obrigatório). Se atende a todos os UCs, liste todos.
+5. descricao — sentença declarativa modal: "O sistema deve [verbo] [objeto] [restrição]."
+6. origemPasso — passo FP do UC principal onde o comportamento ocorre (ex: "FP-2"). Use "" se transversal a vários passos.
+7. prioridade — "Alta" | "Média" | "Baixa"
+8. verificacao — como confirmar o RF (referência a CT ou critério de aceite).
+9. RNF — máx 4 por épico, somente os mais críticos e mensuráveis. Não repita RNFs genéricos.
 Retorne SOMENTE JSON sem markdown:
-{"rf":[{"id":"RF-${prefix}-001","descricao":"string","origemPasso":"FP-2","prioridade":"Alta","verificacao":"string"}],"rnf":[{"id":"RNF-${prefix}-001","categoria":"Performance Efficiency","descricao":"string","metrica":"string","prioridade":"Alta"}]}`;
+{"rf":[{"id":"RF-${prefix}-001","descricao":"string","ucRefs":["FT001","FT002"],"origemPasso":"FP-2","prioridade":"Alta","verificacao":"string"}],"rnf":[{"id":"RNF-${prefix}-001","categoria":"Performance Efficiency","descricao":"string","metrica":"string","prioridade":"Alta"}]}`;
 
     try {
-      const ucCompact = {
+      const ucsCompact = epicUCs.map(uc => ({
         ftId: uc.ftId, titulo: uc.titulo,
         fluxoPrincipal: (uc.fluxoPrincipal || []).map((p, i) => ({ passo: `FP-${i + 1}`, descricao: p.descricao })),
-      };
-      const husCompact = husUC.map(h => ({
-        reqId: h.reqId,
-        criteriosAceitacao: h.criteriosAceitacao || [],
+      }));
+      const husCompact = allHus.map(h => ({
+        reqId: h.reqId, ftId: h.ftId,
+        criteriosAceitacao: (h.criteriosAceitacao || []).map(c => c.descricao),
         regrasNegocio: (h.regrasNegocio || []).map(r => ({ id: r.id, descricao: r.descricao })),
       }));
       const raw = await claude(
-        `UC:\n${JSON.stringify(ucCompact, null, 2)}\n\nHUs:\n${JSON.stringify(husCompact, null, 2)}`,
-        system, 1200, "claude-haiku-4-5-20251001"
+        `Épico: ${epicId} — ${epicTitle}\n\nCasos de Uso:\n${JSON.stringify(ucsCompact, null, 2)}\n\nHUs:\n${JSON.stringify(husCompact, null, 2)}`,
+        system, 3000, "claude-haiku-4-5-20251001"
       );
       const parsed = safeJSON(raw);
-      if (!parsed) { console.warn(`[enrichRFRNF] ${uc.ftId}: JSON inválido`); continue; }
-      uc.requisitosFuncionais    = (parsed.rf  || []).filter(r => r.id && r.descricao);
-      uc.requisitosNaoFuncionais = (parsed.rnf || []).filter(r => r.id && r.descricao);
-      console.log(`[enrichRFRNF] ${uc.ftId}: ${uc.requisitosFuncionais.length} RF, ${uc.requisitosNaoFuncionais.length} RNF`);
+      if (!parsed) { console.warn(`[enrichRFRNF] épico ${epicId}: JSON inválido`); continue; }
+
+      const rfs  = (parsed.rf  || []).filter(r => r.id && r.descricao);
+      const rnfs = (parsed.rnf || []).filter(r => r.id && r.descricao);
+
+      // Distribui cada RF para o UC primário (primeiro em ucRefs)
+      rfs.forEach(rf => {
+        const primaryFtId = (rf.ucRefs || [])[0] || epicUCs[0].ftId;
+        const owner = epicUCs.find(u => u.ftId === primaryFtId) || epicUCs[0];
+        owner.requisitosFuncionais.push(rf);
+      });
+      // RNFs ficam no primeiro UC do épico (são épico-wide)
+      if (rnfs.length) epicUCs[0].requisitosNaoFuncionais = rnfs;
+
+      console.log(`[enrichRFRNF] épico ${epicId}: ${rfs.length} RF, ${rnfs.length} RNF (${epicUCs.length} UCs)`);
     } catch (e) {
-      console.warn(`[enrichRFRNF] ${uc.ftId} falhou (${e.message}) — arrays vazios.`);
-      uc.requisitosFuncionais    = uc.requisitosFuncionais    || [];
-      uc.requisitosNaoFuncionais = uc.requisitosNaoFuncionais || [];
+      console.warn(`[enrichRFRNF] épico ${epicId} falhou (${e.message})`);
     }
   }
   return updated;
@@ -1229,11 +1253,12 @@ function wikiRFFile(ep, ucsEp, husEp, modulo) {
   );
   let md = wikiYaml(`Requisitos Funcionais - ${titulo}`, modulo, "requisitos-funcionais");
   md += `# Requisitos Funcionais - ${titulo}\n\n`;
-  md += `## Tabela\n\n| ID | Descricao | Origem no Fluxo | Prioridade | Status | Caso de Uso | Verificacao |\n|----|-----------|----------------|-----------|--------|-------------|-------------|\n`;
+  md += `## Tabela\n\n| ID | Descricao | Origem no Fluxo | Prioridade | Status | Casos de Uso | Verificacao |\n|----|-----------|----------------|-----------|--------|--------------|-------------|\n`;
   if (rfs.length) {
     rfs.forEach(rf => {
-      const desc = (rf.descricao || "").slice(0, 80);
-      md += `| ${rf.id} | ${desc} | ${rf.origemPasso || "—"} | ${rf.prioridade || "Alta"} | Proposto | ${rf.ftId} | ${rf.verificacao || "A definir"} |\n`;
+      const desc   = (rf.descricao || "").slice(0, 80);
+      const ucList = (rf.ucRefs || [rf.ftId]).filter(Boolean).join(", ") || rf.ftId || "—";
+      md += `| ${rf.id} | ${desc} | ${rf.origemPasso || "—"} | ${rf.prioridade || "Alta"} | Proposto | ${ucList} | ${rf.verificacao || "A definir"} |\n`;
     });
   } else {
     md += `| RF-MOD-001 | O sistema deve... | FP-1 | Alta | Proposto | — | A definir |\n`;
@@ -1241,12 +1266,15 @@ function wikiRFFile(ep, ucsEp, husEp, modulo) {
   md += `\n---\n\n## Detalhamento\n\n`;
   if (rfs.length) {
     rfs.forEach(rf => {
-      const uc = ucsEp.find(u => u.ucId === rf.ucId);
-      const ucSlug = uc ? `${uc.ftId}-${toSlug(uc.titulo)}` : null;
+      const uc = ucsEp.find(u => u.ftId === (rf.ucRefs?.[0] || rf.ftId) || u.ucId === rf.ucId);
       md += `### ${rf.id}\n\n`;
       md += `**Descricao:** ${rf.descricao}\n\n`;
       md += `**Origem no Fluxo:** ${rf.origemPasso || "—"}\n\n`;
-      md += ucSlug ? `**Caso de Uso:** [${uc.ftId} — ${uc.titulo}](Casos-de-Uso/${ucSlug})\n\n` : `**Caso de Uso:** —\n\n`;
+      const ucRefLinks = (rf.ucRefs || (uc ? [uc.ftId] : [])).map(ftId => {
+        const u = ucsEp.find(x => x.ftId === ftId);
+        return u ? `[${ftId} — ${u.titulo}](Casos-de-Uso/${ftId}-${toSlug(u.titulo)})` : ftId;
+      }).join(", ");
+      md += `**Casos de Uso:** ${ucRefLinks || "—"}\n\n`;
       md += `**Prioridade:** ${rf.prioridade || "Alta"}\n\n**Status:** Proposto\n\n`;
       md += `**Criterio de Verificacao:** ${rf.verificacao || "A definir"}\n\n`;
     });
@@ -1956,7 +1984,7 @@ export default function AgenteRequisitos() {
         setHus(enriched);
         setSelectedWI(enriched.map((_, i) => i));
         log("📋 Extraindo RF e RNF...");
-        setUcs(await enrichRFRNF(enriched, allUCs));
+        setUcs(await enrichRFRNF(enriched, allUCs, allEpicos));
         setCts([]);
         goToPhase(4);
       } else if (allUCs.length) {
@@ -2039,7 +2067,7 @@ export default function AgenteRequisitos() {
       setHus(enriched);
       setSelectedWI(enriched.map((_, i) => i));
       log("📋 Extraindo RF e RNF...");
-      setUcs(await enrichRFRNF(enriched, ucs));
+      setUcs(await enrichRFRNF(enriched, ucs, epicos));
       if (ucsSemHU.length) {
         setError(
           `⚠ Alerta: ${ucsSemHU.length} UC(s) não retornaram HUs válidas da IA — foi criada 1 HU básica para cada. Revise usando o painel de correção:\n• ${ucsSemHU.join("\n• ")}`
@@ -2117,7 +2145,7 @@ export default function AgenteRequisitos() {
       setHus(enriched);
       setSelectedWI(enriched.map((_, i) => i));
       log("📋 Extraindo RF e RNF...");
-      setUcs(await enrichRFRNF(enriched, ucs));
+      setUcs(await enrichRFRNF(enriched, ucs, epicos));
       setCorrHUs("");
       if (ucsSemHU.length) setError(`⚠ Alerta: HU básica criada para: ${ucsSemHU.join(", ")}. Revise com o painel de correção.`);
     } catch (e) { setErr(e.message, e); }
@@ -2239,7 +2267,7 @@ export default function AgenteRequisitos() {
     if (enrichingRFRNF) return;
     setEnrichingRFRNF(true);
     try {
-      const updated = await enrichRFRNF(hus, ucs);
+      const updated = await enrichRFRNF(hus, ucs, epicos);
       setUcs(updated);
     } catch (e) {
       setError(`Erro ao enriquecer RF/RNF: ${e.message}`);
