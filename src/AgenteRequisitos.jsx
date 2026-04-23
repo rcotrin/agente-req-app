@@ -2269,7 +2269,8 @@ export default function AgenteRequisitos() {
       fluxoPrincipal: (uc.fluxoPrincipal || []).map(p => ({
         ...p,
         refs: safeRefs(p.refs).filter(r => r !== refId),
-        descricao: (p.descricao || "").replace(new RegExp(`\\s*\\(?${esc}\\)?`, "g"), "").trim(),
+        // Remove o ID e espaços duplos resultantes — cobre refs, brackets e pontuação ao redor
+        descricao: (p.descricao || "").replace(new RegExp(esc, "g"), "").replace(/\s{2,}/g, " ").trim(),
       })),
     })));
   };
@@ -4248,6 +4249,8 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
   };
 
   const applySuggestion = (sug) => {
+    // Sempre descarta da lista — mesmo se tipo null ou ação inválida — para o bloco não travar
+    setDismissedIds(prev => new Set([...prev, sug.rnId]));
     const { tipo, ownerFtId } = sug;
     if (!tipo) return;
     if (sug.acao === "renomear" && sug.novoId) {
@@ -4268,7 +4271,6 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
       // Remove de p.refs E p.descricao para não deixar lacuna em loop
       onRemoveLacunaRef(sug.rnId);
     }
-    setDismissedIds(prev => new Set([...prev, sug.rnId]));
   };
 
   const applyAll = () => {
