@@ -4047,9 +4047,16 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
         const item = ucs.flatMap(u => u.requisitosNaoFuncionais || []).find(r => r.id === id);
         return { id, descricao: item?.descricao || "", tipo: "RNF", ownerFtId: rnfByUC.get(id) };
       });
+      const allOrfaosInfo = [...orfaosRNInfo, ...orfaosRFInfo, ...orfaosRNFInfo];
       const allLacunas = [...lacunas, ...lacunasRF, ...lacunasRNF];
-      const result = await resolverOrfaosIA([...orfaosRNInfo, ...orfaosRFInfo, ...orfaosRNFInfo], allLacunas, ucs);
-      setSuggestions(result);
+      const result = await resolverOrfaosIA(allOrfaosInfo, allLacunas, ucs);
+      // Enriquece cada sugestão com tipo/ownerFtId na hora da geração,
+      // para não depender de lookup no momento do clique (evita falha por estado stale).
+      const enriched = result.map(sug => {
+        const info = allOrfaosInfo.find(o => o.id === sug.rnId);
+        return { ...sug, tipo: info?.tipo || null, ownerFtId: info?.ownerFtId || null };
+      });
+      setSuggestions(enriched);
     } catch (e) {
       setResolveError(e.message);
     } finally {
@@ -4057,26 +4064,19 @@ function AuditPanel({ ucs, hus, onFixRef, onRemoveOrphan, onRenameOrphan, onLink
     }
   };
 
-  const getOrfaoInfo = (rnId) => {
-    if (orfaos.includes(rnId))   return { tipo: "RN" };
-    if (orfaosRF.includes(rnId)) return { tipo: "RF",  ownerFtId: rfByUC.get(rnId) };
-    if (orfaosRNF.includes(rnId))return { tipo: "RNF", ownerFtId: rnfByUC.get(rnId) };
-    return null;
-  };
-
   const applySuggestion = (sug) => {
-    const info = getOrfaoInfo(sug.rnId);
-    if (!info) return;
+    const { tipo, ownerFtId } = sug;
+    if (!tipo) return;
     if (sug.acao === "renomear" && sug.novoId) {
-      if (info.tipo === "RN")  onRenameOrphan(sug.rnId, sug.novoId);
-      if (info.tipo === "RF")  onRenameOrphanInUC(info.ownerFtId, "requisitosFuncionais",    sug.rnId, sug.novoId);
-      if (info.tipo === "RNF") onRenameOrphanInUC(info.ownerFtId, "requisitosNaoFuncionais", sug.rnId, sug.novoId);
+      if (tipo === "RN")  onRenameOrphan(sug.rnId, sug.novoId);
+      if (tipo === "RF")  onRenameOrphanInUC(ownerFtId, "requisitosFuncionais",    sug.rnId, sug.novoId);
+      if (tipo === "RNF") onRenameOrphanInUC(ownerFtId, "requisitosNaoFuncionais", sug.rnId, sug.novoId);
     } else if (sug.acao === "vincular" && sug.ftId && sug.passo) {
-      onLinkOrphanToStep(sug.rnId, sug.ftId, sug.passo);
+      onLinkOrphanToStep(sug.rnId, sug.ftId, String(sug.passo));
     } else if (sug.acao === "remover") {
-      if (info.tipo === "RN")  onRemoveOrphan(sug.rnId);
-      if (info.tipo === "RF")  onRemoveOrphanFromUC(info.ownerFtId, "requisitosFuncionais",    sug.rnId);
-      if (info.tipo === "RNF") onRemoveOrphanFromUC(info.ownerFtId, "requisitosNaoFuncionais", sug.rnId);
+      if (tipo === "RN")  onRemoveOrphan(sug.rnId);
+      if (tipo === "RF")  onRemoveOrphanFromUC(ownerFtId, "requisitosFuncionais",    sug.rnId);
+      if (tipo === "RNF") onRemoveOrphanFromUC(ownerFtId, "requisitosNaoFuncionais", sug.rnId);
     }
     setDismissedIds(prev => new Set([...prev, sug.rnId]));
   };
