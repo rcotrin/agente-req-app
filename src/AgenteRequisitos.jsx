@@ -968,25 +968,11 @@ function auditarReferencias(ucs, hus) {
   const mkOrfaos = (defs, refs) =>
     [...defs].filter(id => !refs.has(id)).sort();
 
-  // RF órfão: ucRefs vazio ou aponta apenas para ftIds inexistentes
-  // RFs são capacidades do sistema — linkagem via ucRefs, não via p.refs
-  const validFtIds = new Set(ucs.map(u => u.ftId));
-  const rfItemMap  = new Map();
-  ucs.forEach(uc => (uc.requisitosFuncionais || []).forEach(r => { if (r.id) rfItemMap.set(r.id, r); }));
-  const orfaosRF = [...definidosRF].filter(id => {
-    const rf   = rfItemMap.get(id);
-    const refs = rf?.ucRefs || [];
-    return refs.length === 0 || !refs.some(ref => validFtIds.has(ref));
-  }).sort();
-
-  // RNF não tem ucRefs — é épico-wide e já está dentro de uma UC por definição
-  // Considera órfão apenas se o objeto não tiver descrição (incompleto)
-  const rnfItemMap = new Map();
-  ucs.forEach(uc => (uc.requisitosNaoFuncionais || []).forEach(r => { if (r.id) rnfItemMap.set(r.id, r); }));
-  const orfaosRNF = [...definidosRNF].filter(id => {
-    const rnf = rnfItemMap.get(id);
-    return !rnf?.descricao;
-  }).sort();
+  // RF/RNF são capacidades ligadas via ucRefs (populadas por enrichRFRNF).
+  // Não auditamos órfãos RF/RNF: ações de fix (vincular) adicionam a p.refs,
+  // não a ucRefs, criando um loop infinito de detecção. Apenas lacunas são auditadas.
+  const orfaosRF  = [];
+  const orfaosRNF = [];
 
   return {
     // RN
