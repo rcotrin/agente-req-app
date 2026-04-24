@@ -261,7 +261,7 @@ REGRAS OBRIGATÓRIAS:
 CAMPOS ADICIONAIS OBRIGATÓRIOS:
 - "gatilho": evento ou ação do ator que inicia o UC (ex: "Usuário aciona opção Processar"). DIFERENTE de pré-condição — é o evento disparador, não um estado. NUNCA deixe vazio.
 Retorne SOMENTE JSON (sem markdown):
-{"ucs":[{"ftId":"FT001","ucId":"UC001","titulo":"string","atores":["string"],"precondição":"string","gatilho":"evento que dispara o UC","fluxoPrincipal":[{"passo":"1","descricao":"string","refs":["RN001","RN002"]},{"passo":"2","descricao":"string","refs":[]}],"fluxosAlternativos":[{"id":"FA1","titulo":"string","origemPasso":"FP-2","descricao":"Este fluxo alternativo se inicia quando o ator aciona X no passo FP-2 do fluxo principal.","passos":["string"]}],"fluxosExcecao":[{"id":"FE1","origemPasso":"FP-2","descricao":"Este fluxo de exceção ocorre quando Y no passo FP-2 do fluxo principal.","mensagem":"string","retorno":"string"}],"posCondição":"string"}]}`;
+{"ucs":[{"ftId":"FT001","ucId":"UC001","titulo":"string","atores":["string"],"precondição":"string","gatilho":"evento que dispara o UC","fluxoPrincipal":[{"passo":"1","descricao":"string","refs":[]},{"passo":"2","descricao":"string","refs":[]}],"fluxosAlternativos":[{"id":"FA1","titulo":"string","origemPasso":"FP-2","descricao":"Este fluxo alternativo se inicia quando o ator aciona X no passo FP-2 do fluxo principal.","passos":["string"]}],"fluxosExcecao":[{"id":"FE1","origemPasso":"FP-2","descricao":"Este fluxo de exceção ocorre quando Y no passo FP-2 do fluxo principal.","mensagem":"string","retorno":"string"}],"posCondição":"string"}]}`;
   const corrNote = correction ? `\n\n⚠ CORREÇÃO SOLICITADA PELO ANALISTA: ${correction}` : "";
   const raw = await claude(
     `Épico: ${epico.id} — ${epico.titulo}\nObjetivo: ${epico.objetivo || ""}\nEntidades com padrão Manter: ${(epico.manterEntidades || []).join(", ") || "nenhuma"}\n\nFuncionalidades:\n${JSON.stringify(funcsDoEpico, null, 2)}\n\nGere todos os Casos de Uso.${corrNote}`,
@@ -859,6 +859,27 @@ Retorne SOMENTE JSON sem markdown:
   );
 
   return (safeJSON(raw) || recoverPartialJSON(raw))?.sugestoes || [];
+}
+
+// ════════════════════════════════════════════════════════════════════
+// LIMPAR REFS FANTASMA
+// Remove de p.refs qualquer ID que comece com "RN" mas não exista em
+// nenhuma hu.regrasNegocio — elimina placeholders copiados do exemplo
+// do prompt ("RN001", "RN002"...) que a IA insere quando não sabe os IDs reais.
+// Preserva IDs de RF, RNF, MSG e qualquer outro prefixo.
+// ════════════════════════════════════════════════════════════════════
+
+function limparRefFantasma(ucs, hus) {
+  const rnIds = new Set(
+    hus.flatMap(h => (h.regrasNegocio || []).map(rn => rn.id)).filter(Boolean)
+  );
+  return ucs.map(uc => ({
+    ...uc,
+    fluxoPrincipal: (uc.fluxoPrincipal || []).map(p => ({
+      ...p,
+      refs: safeRefs(p.refs).filter(id => !id.startsWith("RN") || rnIds.has(id)),
+    })),
+  }));
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -2031,7 +2052,7 @@ export default function AgenteRequisitos() {
         setHus(enriched);
         setSelectedWI(enriched.map((_, i) => i));
         log("📋 Extraindo RF e RNF...");
-        setUcs(await enrichRFRNF(enriched, allUCs, allEpicos));
+        setUcs(await enrichRFRNF(enriched, limparRefFantasma(allUCs, enriched), allEpicos));
         setCts([]);
         goToPhase(4);
       } else if (allUCs.length) {
@@ -2114,7 +2135,7 @@ export default function AgenteRequisitos() {
       setHus(enriched);
       setSelectedWI(enriched.map((_, i) => i));
       log("📋 Extraindo RF e RNF...");
-      setUcs(await enrichRFRNF(enriched, ucs, epicos));
+      setUcs(await enrichRFRNF(enriched, limparRefFantasma(ucs, enriched), epicos));
       if (ucsSemHU.length) {
         setError(
           `⚠ Alerta: ${ucsSemHU.length} UC(s) não retornaram HUs válidas da IA — foi criada 1 HU básica para cada. Revise usando o painel de correção:\n• ${ucsSemHU.join("\n• ")}`
@@ -2192,7 +2213,7 @@ export default function AgenteRequisitos() {
       setHus(enriched);
       setSelectedWI(enriched.map((_, i) => i));
       log("📋 Extraindo RF e RNF...");
-      setUcs(await enrichRFRNF(enriched, ucs, epicos));
+      setUcs(await enrichRFRNF(enriched, limparRefFantasma(ucs, enriched), epicos));
       setCorrHUs("");
       if (ucsSemHU.length) setError(`⚠ Alerta: HU básica criada para: ${ucsSemHU.join(", ")}. Revise com o painel de correção.`);
     } catch (e) { setErr(e.message, e); }
