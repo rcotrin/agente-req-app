@@ -1056,6 +1056,23 @@ function wikiUCFile(uc, husDoUC, ep, modulo) {
     });
   });
 
+  // Monta mapa reverso passo-normalizado → Set de IDs de FA/FE que partem daquele passo
+  const fafeByPasso = {};
+  (uc.fluxosAlternativos || []).forEach(fa => {
+    const key = normalizePasso(fa.origemPasso || fa.origem);
+    if (key && fa.id) {
+      if (!fafeByPasso[key]) fafeByPasso[key] = new Set();
+      fafeByPasso[key].add(fa.id);
+    }
+  });
+  (uc.fluxosExcecao || []).forEach(fe => {
+    const key = normalizePasso(fe.origemPasso || fe.gatilho);
+    if (key && fe.id) {
+      if (!fafeByPasso[key]) fafeByPasso[key] = new Set();
+      fafeByPasso[key].add(fe.id);
+    }
+  });
+
   // 6. Fluxo Principal — âncoras + coluna Referências
   md += `## 6. Fluxo Principal\n\n| Passo | Ator | Acao | Referencias |\n|-------|------|------|-------------|\n`;
   (uc.fluxoPrincipal || []).forEach(p => {
@@ -1063,9 +1080,8 @@ function wikiUCFile(uc, husDoUC, ep, modulo) {
     const passoNum  = passoNorm.replace("FP-", "");
     const anchorId  = `fp-${passoNum}`;
     const ator = /^sistema|^o sistema/i.test(p.descricao) ? "Sistema" : (atores[0] || "Usuario");
-    // Merge: refs explícitos da IA + refs inferidos de RN.origemPasso
-    // safeRefs garante que refs é sempre array mesmo se IA retornou string
-    const refsSet = new Set([...safeRefs(p.refs), ...(refsByPasso[passoNorm] || [])]);
+    // Merge: refs explícitos + RN por origemPasso + FA/FE que partem deste passo
+    const refsSet = new Set([...safeRefs(p.refs), ...(refsByPasso[passoNorm] || []), ...(fafeByPasso[passoNorm] || [])]);
     const refsLinks = [...refsSet]
       .map(id => `[${id}](#${id.toLowerCase().replace(/[^a-z0-9-]/g, "-")})`)
       .join(" · ");
