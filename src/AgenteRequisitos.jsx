@@ -3873,7 +3873,8 @@ export default function AgenteRequisitos() {
                     <li><strong>Ator Principal</strong> — quem interage com o sistema (usuário, sistema externo, etc.)</li>
                     <li><strong>Pré-condição</strong> — estado necessário antes da execução</li>
                     <li><strong>Fluxo Principal</strong> — passos numerados da interação esperada entre ator e sistema</li>
-                    <li><strong>Fluxo Alternativo</strong> — desvios, erros e exceções ao fluxo principal</li>
+                    <li><strong>Fluxos Alternativos</strong> — caminhos opcionais ou variações válidas do fluxo principal (ex: ator escolhe opção diferente)</li>
+                    <li><strong>Fluxos de Exceção</strong> — condições de erro ou falha que interrompem o fluxo principal (ex: saldo insuficiente, timeout)</li>
                     <li><strong>Pós-condição</strong> — estado do sistema após a execução bem-sucedida</li>
                   </ul>
                   <p>Use o <strong>painel de correção amarelo</strong> (por UC/Feature) para ajustes pontuais sem regeração completa.</p>
@@ -3962,7 +3963,7 @@ export default function AgenteRequisitos() {
                   <p>A Wiki é gerada com páginas separadas para:</p>
                   <ul style={{ paddingLeft: 18, margin: "6px 0" }}>
                     <li>Visão geral do projeto (índice de épicos)</li>
-                    <li>Cada UC / Feature (com fluxos e RNs)</li>
+                    <li>Cada UC / Feature (Fluxo Principal, Alternativos, Exceções, RNs, RFs e RNFs)</li>
                     <li>Cada HU (com RFs, RNFs e critérios de aceite)</li>
                     <li>Casos de Teste por UC</li>
                   </ul>
@@ -4129,13 +4130,16 @@ export default function AgenteRequisitos() {
                     Documento Fonte<br/>
                     {"    └── "}Épico (EP001)<br/>
                     {"            └── "}Feature / UC (FT001)<br/>
+                    {"                    ├── "}Fluxo Principal (FP-1, FP-2, FP-3...)<br/>
+                    {"                    ├── "}Fluxos Alternativos (FA1, FA2, FA3)<br/>
+                    {"                    ├── "}Fluxos de Exceção (FE1, FE2)<br/>
                     {"                    ├── "}Requisito / HU (REQ001, REQ002...)<br/>
                     {"                    │       └── "}Caso de Teste (CT-FT001-01, 02...)<br/>
                     {"                    ├── "}Regras de Negócio (RN-PREF-001...)<br/>
                     {"                    ├── "}Requisitos Funcionais (RF-PREF-001...)<br/>
                     {"                    └── "}Requisitos Não Funcionais (RNF-PREF-001...)
                   </div>
-                  Cada artefato carrega referência ao nível acima: <code style={{ color: C.accent }}>epicId</code>, <code style={{ color: C.accent }}>ftId/ucId</code>, <code style={{ color: C.accent }}>reqId</code> e <code style={{ color: C.accent }}>origemPasso</code> nas RNs, RFs e RNFs.
+                  Cada artefato carrega referência ao nível acima: <code style={{ color: C.accent }}>epicId</code>, <code style={{ color: C.accent }}>ftId/ucId</code>, <code style={{ color: C.accent }}>reqId</code>. Fluxos Alternativos e de Exceção carregam <code style={{ color: C.accent }}>origemPasso</code> (passo do FP que os dispara); RNs carregam <code style={{ color: C.accent }}>origemPasso</code>; RFs são vinculados a passos via <code style={{ color: C.accent }}>p.refs</code>.
                 </FAQ_Q>
 
                 <FAQ_Q n="2.3" q="Lacunas conhecidas e risco associado" accent={C.purple}>
