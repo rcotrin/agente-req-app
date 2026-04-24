@@ -80,6 +80,9 @@ A decomposição de requisitos em artefatos hierárquicos segue as diretrizes de
 Documento Fonte
     └── Épico (EP001)
             └── Feature / Caso de Uso (FT001)
+                    ├── Fluxo Principal (FP-1, FP-2, FP-3...)
+                    ├── Fluxos Alternativos (FA1, FA2, FA3)
+                    ├── Fluxos de Exceção (FE1, FE2)
                     ├── Requisito / HU (REQ001, REQ002...)
                     │       └── Caso de Teste (CT-FT001-01, 02...)
                     ├── Regras de Negócio (RN-PREF-001...)
@@ -91,6 +94,7 @@ Cada artefato carrega referência explícita ao nível acima:
 - `epicId` em todas as Features, Requisitos e CTs
 - `ftId` / `ucId` em todos os Requisitos e CTs
 - `reqId` nos Casos de Teste
+- `origemPasso` nos Fluxos Alternativos e de Exceção (aponta para o passo do Fluxo Principal que os dispara)
 - `origemPasso` nas Regras de Negócio (aponta para o passo do Fluxo Principal)
 - RFs são vinculados a passos via `p.refs` (mecanismo "vincular" da auditoria); RNFs não possuem vínculo a passos específicos
 
