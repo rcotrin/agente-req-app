@@ -7,7 +7,9 @@ Ferramenta inteligente para geração automatizada de artefatos de requisitos de
 - **Extrai** funcionalidades de documentos (PDF, DOCX, TXT, MD)
 - **Gera** Épicos → Features/UCs → Requisitos/HUs → Casos de Teste
 - **Exporta** work items para o Azure DevOps (Épico → Feature → Requirement → Task)
-- **Publica** documentação estruturada na Wiki do Azure DevOps
+- **Publica** documentação estruturada na Wiki do Azure DevOps, incluindo rastreabilidade RF → Fluxo Principal (coluna "Origem no Fluxo" na seção de Requisitos Funcionais)
+- **Audita** integridade de referências (RN/RF/RNF): detecta lacunas e órfãos, sugere correções via IA e aplica em lote
+- **Enriquece** Requisitos Funcionais (RF) e Não Funcionais (RNF) por épico via IA, com rastreabilidade ao Fluxo Principal
 - **Migra** documentos existentes preservando o conteúdo original
 
 ## Stack

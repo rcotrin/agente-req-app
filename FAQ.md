@@ -91,17 +91,33 @@ Cada artefato carrega referência explícita ao nível acima:
 - `epicId` em todas as Features, Requisitos e CTs
 - `ftId` / `ucId` em todos os Requisitos e CTs
 - `reqId` nos Casos de Teste
-- `origemPasso` nas Regras de Negócio, RFs e RNFs (aponta para o passo do Fluxo Principal)
+- `origemPasso` nas Regras de Negócio (aponta para o passo do Fluxo Principal)
+- RFs são vinculados a passos via `p.refs` (mecanismo "vincular" da auditoria); RNFs não possuem vínculo a passos específicos
 
 #### Auditoria de referências (integridade interna)
 
 O sistema executa verificação automática de:
 - **Lacunas**: IDs de RN/RF/RNF citados nos fluxos mas não definidos nas HUs
-- **Órfãos**: IDs definidos nas HUs mas nunca referenciados nos fluxos
+- **Órfãos**: IDs definidos nas HUs mas nunca referenciados nos fluxos — inclui RF definidos mas ausentes de qualquer `p.refs`; RNF não são cobrados (sem vínculo obrigatório a passos)
+- Itens resolvidos via "Resolver com IA" → "Aplicar Todos" somem da lista imediatamente (filtragem por `dismissedIds`)
+
+#### Rastreabilidade RF → Fluxo Principal no wiki gerado
+
+A Seção 10 (Requisitos Funcionais) do documento wiki exibe a coluna **"Origem no Fluxo"** com links reais para os passos que referenciam cada RF via `p.refs`. A Seção 6 (Fluxo Principal) lista tanto RN quanto RF vinculados na coluna Referências.
 
 ---
 
-### 2.3 Lacuna conhecida e risco associado
+### 2.3 Refs fantasma e limpeza automática
+
+O LLM pode gerar IDs de RN como placeholder (`RN001`, `RN002`) em `p.refs` sem que esses IDs existam nas regras de negócio reais. Para evitar que esses vínculos espúrios poluam a rastreabilidade:
+
+- O prompt de geração de UCs usa `"refs":[]` como exemplo, eliminando o padrão que induzia a cópia literal de IDs fictícios.
+- A função `limparRefFantasma()` varre todos os `p.refs` e remove IDs com prefixo `RN` não encontrados em nenhuma `hu.regrasNegocio`; preserva `RF-`, `RNF-` e `MSG-`.
+- É aplicada automaticamente na geração normal de HUs, na migração e na regeneração com correção.
+
+---
+
+### 2.4 Lacuna conhecida e risco associado
 
 | Lacuna | Norma impactada | Risco |
 |--------|----------------|-------|
@@ -111,7 +127,7 @@ O sistema executa verificação automática de:
 
 ---
 
-### 2.4 Por que mesmo assim esta abordagem é superior ao documento único
+### 2.5 Por que mesmo assim esta abordagem é superior ao documento único
 
 Utilizar um único documento como entrega final (ex: um PDF de especificação) cria riscos ainda maiores:
 
@@ -124,7 +140,7 @@ A abordagem decomposta, mesmo com a lacuna de rastreabilidade de origem, **reduz
 
 ---
 
-### 2.5 Plano de melhoria de conformidade
+### 2.6 Plano de melhoria de conformidade
 
 Para atingir conformidade plena com ISO 29148 e CMMI ML2/MPS.BR G, as seguintes melhorias estão planejadas:
 
