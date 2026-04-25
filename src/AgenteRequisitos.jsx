@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { buildIndex, queryIndex } from "./rag.js";
+// import { buildIndex, queryIndex } from "./rag.js"; // RAG desativado
 
 const STORAGE_KEY = "agente_req_v1";
 function loadSaved() {
@@ -10,10 +10,10 @@ function loadSaved() {
 let _apiKey = "";
 export function setApiKey(k) { _apiKey = k; }
 
-let _openaiKey = "";
-let _ragIndex   = null;  // [{ text, embedding }] — construído após Fase 0
-export function setOpenAIKey(k)  { _openaiKey = k; }
-export function setRagIndex(idx) { _ragIndex  = idx; }
+// let _openaiKey = "";
+// let _ragIndex   = null;
+// export function setOpenAIKey(k)  { _openaiKey = k; }
+// export function setRagIndex(idx) { _ragIndex  = idx; }
 
 // ════════════════════════════════════════════════════════════════════
 // UTILS
@@ -254,7 +254,12 @@ Retorne SOMENTE JSON:
 // ════════════════════════════════════════════════════════════════════
 
 async function fase2_gerarUCsParaEpico(epico, funcList, ucStartIdx, correction = "") {
-  const funcsDoEpico = funcList.filter(f => (epico.funcIds || []).includes(f.id));
+  let funcsDoEpico = funcList.filter(f => (epico.funcIds || []).includes(f.id));
+  if (!funcsDoEpico.length && funcList.length) {
+    // IDs da IA não bateram com funcList (ex: "F1" vs "F001") — usa lista completa como fallback
+    console.warn(`[fase2] ${epico.id}: funcIds ${JSON.stringify(epico.funcIds)} sem match em funcList (${funcList.length} items) — usando funcList completo`);
+    funcsDoEpico = funcList;
+  }
   const system = `Você é um Analista de Requisitos UML 2.5.1. Gere TODOS os Casos de Uso do Épico.
 REGRAS OBRIGATÓRIAS:
 1. PADRÃO MANTER: CRUD da mesma entidade → UM UC "Manter [Entidade]". Fluxo principal = Consultar. Alternativos: FA1=Incluir, FA2=Alterar, FA3=Excluir. NÃO gere UCs separados para cada operação CRUD.
@@ -272,18 +277,12 @@ Retorne SOMENTE JSON (sem markdown):
 {"ucs":[{"ftId":"FT001","ucId":"UC001","titulo":"string","atores":["string"],"precondição":"string","gatilho":"evento que dispara o UC","fluxoPrincipal":[{"passo":"1","descricao":"string","refs":[]},{"passo":"2","descricao":"string","refs":[]}],"fluxosAlternativos":[{"id":"FA1","titulo":"string","origemPasso":"FP-2","descricao":"Este fluxo alternativo se inicia quando o ator aciona X no passo FP-2 do fluxo principal.","passos":["string"]}],"fluxosExcecao":[{"id":"FE1","origemPasso":"FP-2","descricao":"Este fluxo de exceção ocorre quando Y no passo FP-2 do fluxo principal.","mensagem":"string","retorno":"string"}],"posCondição":"string"}]}`;
   const corrNote = correction ? `\n\n⚠ CORREÇÃO SOLICITADA PELO ANALISTA: ${correction}` : "";
 
-  // RAG: injeta trechos do documento original relevantes ao épico (opcional)
-  let ragCtx = "";
-  if (_ragIndex?.length && _openaiKey) {
-    try {
-      const q = `${epico.titulo} ${epico.objetivo || ""} ${funcsDoEpico.map(f => f.titulo).join(" ")}`;
-      ragCtx = await queryIndex(_ragIndex, q, _openaiKey, 4);
-    } catch { /* RAG opcional — não bloqueia geração */ }
-  }
-  const ragNote = ragCtx ? `\n\nTrechos relevantes do documento original:\n---\n${ragCtx}\n---\n` : "";
+  // RAG desativado — será reativado com solução de persistência
+  // let ragCtx = "";
+  // if (_ragIndex?.length && _openaiKey) { ... }
 
   const raw = await claude(
-    `Épico: ${epico.id} — ${epico.titulo}\nObjetivo: ${epico.objetivo || ""}\nEntidades com padrão Manter: ${(epico.manterEntidades || []).join(", ") || "nenhuma"}\n\nFuncionalidades:\n${JSON.stringify(funcsDoEpico, null, 2)}${ragNote}\n\nGere todos os Casos de Uso.${corrNote}`,
+    `Épico: ${epico.id} — ${epico.titulo}\nObjetivo: ${epico.objetivo || ""}\nEntidades com padrão Manter: ${(epico.manterEntidades || []).join(", ") || "nenhuma"}\n\nFuncionalidades:\n${JSON.stringify(funcsDoEpico, null, 2)}\n\nGere todos os Casos de Uso.${corrNote}`,
     system, 8000
   );
   const ucs = safeJSON(raw)?.ucs || recoverPartialJSON(raw)?.ucs || [];
@@ -362,19 +361,13 @@ Retorne SOMENTE JSON sem markdown:
       id: e.id, origemPasso: e.origemPasso, descricao: e.descricao, mensagem: e.mensagem,
     })),
   };
-  // RAG: injeta contexto do documento original sobre este UC (opcional)
-  let ragCtx3 = "";
-  if (_ragIndex?.length && _openaiKey) {
-    try {
-      const q = `${uc.titulo} ${uc.epicTitulo || ""} regras de negócio requisitos`;
-      ragCtx3 = await queryIndex(_ragIndex, q, _openaiKey, 3);
-    } catch { /* RAG opcional */ }
-  }
-  const ragNote3 = ragCtx3 ? `\n\nTrechos relevantes do documento original:\n---\n${ragCtx3}\n---\n` : "";
+  // RAG desativado — será reativado com solução de persistência
+  // let ragCtx3 = "";
+  // if (_ragIndex?.length && _openaiKey) { ... }
 
   const raw = await claude(
-    `Caso de Uso:\n${JSON.stringify(ucCompact, null, 2)}${ragNote3}\n\nGere as HUs. Primeira começa em REQ${pad3(huStartIdx + 1)}.${corrNote}`,
-    system, 16000
+    `Caso de Uso:\n${JSON.stringify(ucCompact, null, 2)}\n\nGere as HUs. Primeira começa em REQ${pad3(huStartIdx + 1)}.${corrNote}`,
+    system, 8192
   );
   const hus = safeJSON(raw)?.hus || recoverPartialJSON(raw)?.hus || [];
   hus.forEach((hu, i) => {
@@ -1970,12 +1963,8 @@ export default function AgenteRequisitos() {
   });
   const handleApiKey = k => { _apiKey = k; setApiKeyState(k); sessionStorage.setItem("anthropic_key", k); };
 
-  const [openaiKey, setOpenaiKeyState] = useState(() => {
-    const saved = sessionStorage.getItem("openai_key") || "";
-    _openaiKey = saved;
-    return saved;
-  });
-  const handleOpenaiKey = k => { _openaiKey = k; setOpenaiKeyState(k); sessionStorage.setItem("openai_key", k); };
+  // const [openaiKey, setOpenaiKeyState] = useState(""); // RAG desativado
+  // const handleOpenaiKey = k => { ... };
 
   // ── Avança para fase e atualiza maxPhase ──────────────────────────
   const goToPhase = (n) => {
@@ -2035,17 +2024,8 @@ export default function AgenteRequisitos() {
       const normalizedText = await fase0_normalizarTexto(text, f.name);
       setChunks(chunkText(normalizedText, 3500));
 
-      // RAG: constrói índice de embeddings se chave OpenAI estiver configurada
-      if (_openaiKey) {
-        try {
-          log("🔍 Indexando documento com embeddings (RAG)…");
-          const idx = await buildIndex(normalizedText, _openaiKey, msg => log(msg));
-          setRagIndex(idx);
-          log(`✅ Índice RAG: ${idx.length} trechos indexados`);
-        } catch (e) {
-          console.warn("[RAG] falhou ao indexar:", e.message, "— continuando sem RAG");
-        }
-      }
+      // RAG desativado — será reativado com solução de persistência
+      // if (_openaiKey) { ... buildIndex ... }
 
       goToPhase(1);
     } catch (e) { setErr(e.message, e); }
@@ -2936,14 +2916,14 @@ export default function AgenteRequisitos() {
             onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}>
             ? FAQ
           </button>
-          <span style={{ fontSize: 12, color: C.textDim, whiteSpace: "nowrap" }}>Anthropic</span>
+          <span style={{ fontSize: 12, color: C.textDim, whiteSpace: "nowrap" }}>API Key</span>
           <input type="password" value={apiKey} onChange={e => handleApiKey(e.target.value)} placeholder="sk-ant-..."
-            style={{ width: 190, padding: "6px 12px", fontSize: 12, background: "#f8fafc", border: `1px solid ${apiKey ? C.green : "#cbd5e1"}`, borderRadius: 6, color: C.text, fontFamily: "inherit", outline: "none" }} />
+            style={{ width: 210, padding: "6px 12px", fontSize: 12, background: "#f8fafc", border: `1px solid ${apiKey ? C.green : "#cbd5e1"}`, borderRadius: 6, color: C.text, fontFamily: "inherit", outline: "none" }} />
           {apiKey && <span style={{ color: C.green, fontSize: 13, fontWeight: 700 }}>✓</span>}
-          <span style={{ fontSize: 12, color: C.textDim, whiteSpace: "nowrap", marginLeft: 8 }}>OpenAI <span style={{ fontSize: 10, color: C.accent }}>(RAG)</span></span>
-          <input type="password" value={openaiKey} onChange={e => handleOpenaiKey(e.target.value)} placeholder="sk-..."
-            style={{ width: 190, padding: "6px 12px", fontSize: 12, background: "#f8fafc", border: `1px solid ${openaiKey ? C.accent : "#cbd5e1"}`, borderRadius: 6, color: C.text, fontFamily: "inherit", outline: "none" }} />
-          {openaiKey && <span style={{ color: C.accent, fontSize: 13, fontWeight: 700 }}>✓</span>}
+          {/* Campo OpenAI/RAG desativado
+          <span style={{ fontSize: 12, color: C.textDim, whiteSpace: "nowrap", marginLeft: 8 }}>OpenAI (RAG)</span>
+          <input type="password" placeholder="sk-..." style={{ width: 190 }} />
+          */}
         </div>
       </div>
 
