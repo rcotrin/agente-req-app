@@ -21,7 +21,18 @@ export function setApiKey(k) { _apiKey = k; }
 
 function chunkText(text, maxChars = 3500) {
   if (text.length <= maxChars) return [text];
-  const paragraphs = text.split(/\n{2,}/);
+  // Divide parágrafos; parágrafos > maxChars (ex: tabelas Markdown) são subdivididos por linha
+  const rawParagraphs = text.split(/\n{2,}/);
+  const paragraphs = [];
+  for (const p of rawParagraphs) {
+    if (p.length <= maxChars) { paragraphs.push(p); continue; }
+    let sub = "";
+    for (const line of p.split("\n")) {
+      if ((sub + line).length > maxChars && sub) { paragraphs.push(sub.trim()); sub = line + "\n"; }
+      else { sub += line + "\n"; }
+    }
+    if (sub.trim()) paragraphs.push(sub.trim());
+  }
   const chunks = [];
   let current = "";
   for (const p of paragraphs) {
