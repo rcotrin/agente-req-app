@@ -11,6 +11,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: path => path.replace(/^\/anthropic/, ""),
       },
+      "/openai": {
+        target: "https://api.openai.com",
+        changeOrigin: true,
+        rewrite: path => path.replace(/^\/openai/, ""),
+      },
       "/devops": {
         target: "https://dev.azure.com",
         changeOrigin: true,

@@ -3,6 +3,7 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/anthropic/:path*", "destination": "https://api.anthropic.com/:path*" },
+    { "source": "/openai/:path*",    "destination": "https://api.openai.com/:path*"     },
     { "source": "/devops/:path*",    "destination": "https://dev.azure.com/:path*"      },
     { "source": "/(.*)",             "destination": "/index.html"                        }
   ]
