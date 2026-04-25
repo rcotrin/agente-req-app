@@ -261,9 +261,11 @@ Retorne SOMENTE JSON:
   const corrNote = correction ? `\n\n⚠ CORREÇÃO SOLICITADA PELO ANALISTA: ${correction}` : "";
   const raw = await claude(
     `Funcionalidades:\n${JSON.stringify(funcList, null, 2)}\n\nAgrupe em Épicos.${corrNote}`,
-    system, 2500, "claude-opus-4-7", 0.3
+    system, 6000, "claude-opus-4-7", 0.3
   );
-  return safeJSON(raw)?.epicos || [];
+  const parsed = safeJSON(raw) || recoverPartialJSON(raw);
+  if (!parsed?.epicos?.length) console.warn("[fase1b] safeJSON/recover falhou. Raw (300):", raw?.slice(0, 300));
+  return parsed?.epicos || [];
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -691,7 +693,7 @@ Retorne SOMENTE JSON:
   const corrNote = correction ? `\n\n⚠ CORREÇÃO SOLICITADA PELO ANALISTA: ${correction}` : "";
   const raw = await claude(
     `UC:\n${JSON.stringify(uc, null, 2)}\nHUs (Requirements):\n${JSON.stringify(husDoUC, null, 2)}\n\nGere CTs — mínimo 1 por HU.${corrNote}`,
-    system, 3000
+    system, 6000
   );
   const cts = safeJSON(raw)?.cts || [];
   cts.forEach(ct => { ct.ucId = uc.ucId; ct.ftId = uc.ftId; ct.epicId = uc.epicId; });
@@ -1992,17 +1994,27 @@ export default function AgenteRequisitos() {
     setMaxPhase(prev => Math.max(prev, n));
   };
 
-  // ── Persiste estado no localStorage ──────────────────────────────
+  // ── Persiste estado no localStorage (camadas para evitar quota exceeded) ──
   useEffect(() => {
-    try {
-      const data = {
-        phase, maxPhase, funcList, epicos, ucs, hus, cts, chunks,
-        produtoTitulo, isCOR,
-        fileName: file?.name ?? savedFileName,
-        savedAt: new Date().toISOString(),
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch { /* quota exceeded — silencioso */ }
+    const base = {
+      phase, maxPhase, funcList, epicos, ucs, hus, cts, chunks,
+      produtoTitulo, isCOR,
+      fileName: file?.name ?? savedFileName,
+      savedAt: new Date().toISOString(),
+    };
+    // Tenta salvar completo; se exceder quota, remove chunks (maiores dados brutos);
+    // se ainda falhar, remove também funcList.
+    const trySet = (data) => {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); return true; }
+      catch { return false; }
+    };
+    if (!trySet(base)) {
+      const { chunks: _c, ...sem_chunks } = base;
+      if (!trySet(sem_chunks)) {
+        const { funcList: _f, ...minimal } = sem_chunks;
+        trySet(minimal);
+      }
+    }
   }, [phase, maxPhase, funcList, epicos, ucs, hus, cts, chunks]);
   const [azOrg, setAzOrg]         = useState("Rafaelcotrin");
   const [azProject, setAzProject] = useState("Projeto DDA");
@@ -2239,6 +2251,7 @@ export default function AgenteRequisitos() {
   async function handleCorrectEpicos() {
     setError(""); setLoading(true);
     try {
+      if (!funcList.length) throw new Error("Funcionalidades não carregadas — processe o documento novamente antes de corrigir os Épicos.");
       log("◈ Regerando Épicos com correções...");
       const eps = await fase1b_gerarEpicos(funcList, corrEpicos);
       if (!eps.length) throw new Error("Não foi possível gerar Épicos.");
