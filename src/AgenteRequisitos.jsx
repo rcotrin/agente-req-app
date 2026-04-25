@@ -114,15 +114,16 @@ function ucToRNPrefix(title) {
 // CLAUDE API
 // ════════════════════════════════════════════════════════════════════
 
-async function claude(prompt, system, maxTokens = 4000, model = "claude-sonnet-4-6") {
+async function claude(prompt, system, maxTokens = 4000, model = "claude-sonnet-4-6", temperature = 0) {
   const key = _apiKey || sessionStorage.getItem("anthropic_key") || "";
   if (!key) throw new Error("API key não configurada. Insira sua chave Anthropic antes de continuar.");
   _apiKey = key;
 
+  // Opus 4.x não suporta temperature (deprecated) — apenas modelos Haiku/Sonnet
   const body = {
     model,
     max_tokens: maxTokens,
-    temperature: 0,
+    ...(model.includes("opus") ? {} : { temperature }),
     system,
     messages: [{ role: "user", content: prompt }],
   };
@@ -245,17 +246,22 @@ IMPORTANTE: Retorne SOMENTE o objeto JSON, sem texto adicional, sem markdown, se
 
 async function fase1b_gerarEpicos(funcList, correction = "") {
   const system = `Você é um Analista de Requisitos Sênior. Agrupe as funcionalidades em Épicos.
+
+⚠ REGRA MAIS IMPORTANTE — LEIA ANTES DE TUDO: O JSON de saída deve conter NO MÁXIMO 4 épicos no array "epicos" (excluindo o COR). Se você identificar mais de 4 grupos naturais, OBRIGATORIAMENTE consolide os mais afins até atingir o limite. NÃO há exceções a essa regra.
+
 REGRAS:
 1. Épico = módulo/domínio de negócio. Nome: OBRIGATORIAMENTE verbo no infinitivo + objeto, máx 60 chars. ID: EP001, EP002... Exemplos corretos: "Gerenciar Pagamentos", "Processar Conciliação DDA", "Controlar Acesso". ERRADO: "Gestão de Pagamentos", "Processamento DDA", "Controle de Acesso".
 2. CRUD consolidado: se 2+ operações CRUD (Inserir/Alterar/Excluir/Consultar) da mesma entidade → liste essa entidade em "manterEntidades". O UC será gerado como "Manter [Entidade]".
-3. Cada Épico deve ter 3-10 funcionalidades relacionadas.
+3. CONSOLIDE agressivamente: funcionalidades duplicadas, redundantes ou de domínios afins devem ir para o mesmo Épico. Ex: "Motor de Conciliação" + "Matching Hierárquico" + "Seleção de Boletos" → um único "Processar Conciliação Automática". Cada Épico pode ter quantas funcionalidades precisar — não há limite superior por Épico.
 4. ÉPICO COR (OBRIGATÓRIO SE EXISTIR): Se houver funcionalidades TRANSVERSAIS ao sistema (autenticação, autorização, perfis/permissões, auditoria/log, tratamento global de erros, configurações do sistema, gestão de sessão, notificações globais, gestão de usuários), crie UM épico com id "COR" e titulo "COR - Funcionalidades Transversais". Funcionalidades COR NÃO pertencem a nenhum módulo de negócio específico. Se não houver funcionalidades transversais, NÃO crie o épico COR.
+
+VERIFIQUE ANTES DE RESPONDER: conte os épicos no seu output. Se passar de 4, consolide mais antes de retornar.
 Retorne SOMENTE JSON:
 {"epicos":[{"id":"EP001","titulo":"string","objetivo":"string","funcIds":["F001","F002"],"manterEntidades":["Veículo"]},{"id":"COR","titulo":"COR - Funcionalidades Transversais","objetivo":"string","funcIds":["F00x"],"manterEntidades":[]}]}`;
   const corrNote = correction ? `\n\n⚠ CORREÇÃO SOLICITADA PELO ANALISTA: ${correction}` : "";
   const raw = await claude(
     `Funcionalidades:\n${JSON.stringify(funcList, null, 2)}\n\nAgrupe em Épicos.${corrNote}`,
-    system, 5000
+    system, 2500, "claude-opus-4-7", 0.3
   );
   return safeJSON(raw)?.epicos || [];
 }
@@ -275,6 +281,7 @@ async function fase2_gerarUCsParaEpico(epico, funcList, ucStartIdx, correction =
 REGRAS OBRIGATÓRIAS:
 1. PADRÃO MANTER: CRUD da mesma entidade → UM UC "Manter [Entidade]". Fluxo principal = Consultar. Alternativos: FA1=Incluir, FA2=Alterar, FA3=Excluir. NÃO gere UCs separados para cada operação CRUD.
 2. Nome do UC: OBRIGATORIAMENTE verbo no infinitivo + objeto. Exemplos corretos: "Consultar Extrato", "Realizar Transferência", "Manter Usuário". ERRADO: "Consulta de Extrato", "Transferência entre Contas", "Gestão de Usuários".
+2b. QUANTIDADE DE UCs POR ÉPICO: gere entre 3 e 7 Casos de Uso. Priorize COESÃO e COERÊNCIA — cada UC deve ter responsabilidade única e bem definida dentro do domínio do Épico. CONSOLIDE responsabilidades similares em um único UC ao invés de fragmentar.
 3. Máx 7 passos no fluxo principal, máx 3 alternativos, máx 2 exceções. Último passo SEMPRE = "Caso de uso encerra."
 4. IDs serão corrigidos pelo sistema — use FT001, FT002... como placeholder sequencial.
 5. RASTREABILIDADE (obrigatório):
@@ -294,7 +301,7 @@ Retorne SOMENTE JSON (sem markdown):
 
   const raw = await claude(
     `Épico: ${epico.id} — ${epico.titulo}\nObjetivo: ${epico.objetivo || ""}\nEntidades com padrão Manter: ${(epico.manterEntidades || []).join(", ") || "nenhuma"}\n\nFuncionalidades:\n${JSON.stringify(funcsDoEpico, null, 2)}\n\nGere todos os Casos de Uso.${corrNote}`,
-    system, 8000
+    system, 10000, "claude-opus-4-7", 0.3
   );
   const ucs = safeJSON(raw)?.ucs || recoverPartialJSON(raw)?.ucs || [];
   ucs.forEach((uc, i) => {
@@ -353,6 +360,7 @@ REGRAS OBRIGATÓRIAS:
 3b. "workItem.titulo": OBRIGATÓRIO — deve iniciar com verbo no infinitivo. Ex: "Consultar Saldo da Conta", "Registrar Pagamento Recorrente". NUNCA use substantivos como título: ERRADO "Consulta de Saldo", "Registro de Pagamento".
 4. Regras de negócio: IDs no padrão "${rn1}", sequencial. "nome": substantivo curto (máx 5 palavras). "descricao": frase completa. "origemPasso": passo FP onde a regra se aplica (ex: "FP-2").
 5. Critérios: id "Critério 01", "Critério 02"...
+6. OBRIGATORIEDADE MÍNIMA: cada HU DEVE ter no mínimo 1 regra de negócio identificada (campo "regrasNegocio" com ao menos 1 item) E no mínimo 1 critério de aceitação concreto e verificável (campo "criteriosAceitacao" com ao menos 1 item). Jamais retorne HU com arrays vazios nesses campos.
 Retorne SOMENTE JSON sem markdown:
 {"hus":[{"reqId":"REQ001","titulo":"string","como":"Usuário com perfil X","quero":"realizar ação Y","para":"obter benefício Z","regrasNegocio":[{"id":"${rn1}","nome":"Nome Curto","descricao":"Descrição da regra","origemPasso":"FP-2"}],"criteriosAceitacao":[{"id":"Critério 01","descricao":"string"}],"workItem":{"titulo":"string","descricao":"string","criteriosAceitacao":"string","tags":["string"]}}]}`;
   const corrNote = correction ? `\n\n⚠ CORREÇÃO SOLICITADA PELO ANALISTA: ${correction}` : "";
@@ -378,7 +386,7 @@ Retorne SOMENTE JSON sem markdown:
 
   const raw = await claude(
     `Caso de Uso:\n${JSON.stringify(ucCompact, null, 2)}\n\nGere as HUs. Primeira começa em REQ${pad3(huStartIdx + 1)}.${corrNote}`,
-    system, 8192
+    system, 8192, "claude-opus-4-7", 0.3
   );
   const hus = safeJSON(raw)?.hus || recoverPartialJSON(raw)?.hus || [];
   hus.forEach((hu, i) => {
@@ -503,7 +511,7 @@ Retorne SOMENTE JSON sem markdown:
       }));
       const raw = await claude(
         `Épico: ${epicId} — ${epicTitle}\n\nCasos de Uso:\n${JSON.stringify(ucsCompact, null, 2)}\n\nHUs:\n${JSON.stringify(husCompact, null, 2)}`,
-        system, 3000, "claude-haiku-4-5-20251001"
+        system, 4000, "claude-opus-4-7", 0.3
       );
       const parsed = safeJSON(raw) || recoverPartialJSON(raw);
       if (!parsed) { console.warn(`[enrichRFRNF] épico ${epicId}: JSON inválido`); continue; }
@@ -554,6 +562,7 @@ REGRAS CRÍTICAS — PRESERVAÇÃO DE CONTEÚDO:
 3. Se o documento não tiver um campo, deixe como string vazia "".
 4. Preserve idioma e terminologia originais do documento.
 5. Extraia TUDO — não omita nenhum UC, RF, RN, RNF ou critério presente.
+5b. ESCOPO DO DOCUMENTO: o documento representa UM ÚNICO ÉPICO. Gere entre 3 e 7 UCs/Features — consolide responsabilidades similares, não fragmente. Cada HU DEVE ter no mínimo 1 regra de negócio (regrasNegocio com ≥1 item) E no mínimo 1 critério de aceitação (criteriosAceitacao com ≥1 item).
 6. Para documentos de Requisitos Funcionais: cada RF vira uma HU.
 7. Para documentos de Casos de Uso: extraia fluxos completos com todos os passos.
 8. Para documentos mistos: extraia tudo que encontrar em cada seção.
@@ -574,7 +583,7 @@ async function migrarDocumentoChunk(filename, content, epIdx, ucStartIdx, huStar
   const system = buildMigrationSystem(epId, ucStartIdx, huStartIdx);
   const raw = await claude(
     `Arquivo: ${filename}\n\nConteúdo:\n${content}`,
-    system, 8192
+    system, 8192, "claude-opus-4-7", 0.3
   );
   // Tenta parse normal primeiro; se falhar, tenta recuperar JSON truncado
   const parsed = safeJSON(raw) || recoverPartialJSON(raw);
@@ -2147,13 +2156,22 @@ export default function AgenteRequisitos() {
   async function handleUCs() {
     setError(""); setLoading(true);
     const result = [];
+    const erros = [];
     try {
       for (let i = 0; i < epicos.length; i++) {
         log(`◻ Gerando Features para ${epicos[i].id}...`, i, epicos.length);
-        const ucsEp = await fase2_gerarUCsParaEpico(epicos[i], funcList, result.length);
-        result.push(...ucsEp);
+        try {
+          const ucsEp = await fase2_gerarUCsParaEpico(epicos[i], funcList, result.length);
+          result.push(...ucsEp);
+          if (!ucsEp.length) erros.push(`${epicos[i].id}: 0 UCs gerados`);
+        } catch (eEpico) {
+          // Épico falhou (ex: max_tokens) — registra e continua os demais
+          erros.push(`${epicos[i].id}: ${eEpico.message}`);
+          console.error(`[fase2] ${epicos[i].id} falhou:`, eEpico.message);
+        }
       }
-      if (!result.length) throw new Error("Nenhuma Feature (UC) gerada.");
+      if (!result.length) throw new Error(`Nenhuma Feature (UC) gerada.${erros.length ? " Erros: " + erros.join("; ") : ""}`);
+      if (erros.length) log(`⚠ ${erros.length} épico(s) com falha: ${erros.join(", ")} — continuando com ${result.length} UCs`);
       setUcs(result);
       goToPhase(3);
     } catch (e) { setErr(e.message, e); }
