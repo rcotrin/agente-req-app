@@ -3763,6 +3763,7 @@ export default function AgenteRequisitos() {
               onRegenerate={handleCorrectHUs} loading={loading}
               label="Requisitos/HUs precisam de ajuste? Descreva a correção e regere."
             />
+            <QualityPanel report={qualityReport} loading={loading} onEval={handleQualityEval} hasData={!!hus.length} C={C} />
             <div style={{ display: "flex", gap: 10 }}>
               <button className="btn" onClick={() => setPhase(3)} style={{ background: "transparent", border: `1px solid ${C.muted}`, color: C.textDim }}>← Voltar</button>
               <button className="btn" onClick={handleCTs} disabled={loading} style={{ background: "#100800", border: `1px solid ${C.coral}`, color: C.coral }}>
@@ -3790,97 +3791,7 @@ export default function AgenteRequisitos() {
               label="Casos de Teste precisam de ajuste? Descreva a correção e regere."
             />
 
-            {/* ── Avaliação de Qualidade ── */}
-            <div style={{ background: "#f8f9ff", border: `1px solid ${C.accent}30`, borderRadius: 8, padding: "14px 16px", marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: qualityReport ? 14 : 0 }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 2 }}>
-                    Autocrítica de Qualidade
-                  </div>
-                  <div style={{ fontSize: 11, color: C.textDim }}>
-                    Compara a entrada com os artefatos gerados — chamada única, sem loop.
-                  </div>
-                </div>
-                <button
-                  onClick={handleQualityEval}
-                  disabled={loading || !hus.length}
-                  style={{ flexShrink: 0, marginLeft: 12, cursor: loading || !hus.length ? "not-allowed" : "pointer", opacity: loading || !hus.length ? 0.4 : 1, background: "#0a0e1a", border: `1px solid ${C.accent}`, color: C.accent, borderRadius: 7, fontFamily: "'Manrope',sans-serif", fontWeight: 700, fontSize: 12, padding: "8px 16px", whiteSpace: "nowrap" }}
-                >
-                  {loading ? "Avaliando..." : "🔍 Avaliar Qualidade"}
-                </button>
-              </div>
-              {qualityReport && (() => {
-                const score = Number(qualityReport.score);
-                const scoreColor = score < 6 ? C.red : score < 8 ? C.amber : C.green;
-                const scoreLabel = score < 6 ? "Abaixo do limiar — revisão necessária" : score < 8 ? "Aceitável — melhorias recomendadas" : "Boa qualidade";
-                return (
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", background: scoreColor + "12", border: `2px solid ${scoreColor}40`, borderRadius: 10, padding: "10px 18px", minWidth: 80 }}>
-                        <span style={{ fontSize: 28, fontWeight: 800, color: scoreColor, fontFamily: "'Manrope',sans-serif", lineHeight: 1 }}>{score.toFixed(1)}</span>
-                        <span style={{ fontSize: 9, color: scoreColor, fontWeight: 600, marginTop: 2 }}>/10</span>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: scoreColor, marginBottom: 3 }}>{scoreLabel}</div>
-                        {score < 6 && (
-                          <div style={{ fontSize: 11, color: C.red, fontWeight: 600 }}>
-                            ⚠ Score abaixo do limiar operacional (6/10). Revise as sugestões abaixo antes de prosseguir.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {/* Dimensões */}
-                    {(qualityReport.dimensoes || []).length > 0 && (
-                      <div style={{ marginBottom: 14 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>Dimensões</div>
-                        <div style={{ display: "grid", gap: 6 }}>
-                          {qualityReport.dimensoes.map((d, i) => {
-                            const dn = Number(d.nota);
-                            const dc = dn < 6 ? C.red : dn < 8 ? C.amber : C.green;
-                            const barW = `${Math.round((dn / 10) * 100)}%`;
-                            return (
-                              <div key={i} style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 6, padding: "8px 12px" }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                                  <span style={{ fontSize: 11, fontWeight: 600, color: C.textBright }}>{d.nome} {d.peso ? <span style={{ fontSize: 10, color: C.textDim, fontWeight: 400 }}>({d.peso}%)</span> : null}</span>
-                                  <span style={{ fontSize: 12, fontWeight: 700, color: dc }}>{dn.toFixed(1)}</span>
-                                </div>
-                                <div style={{ height: 4, background: "#eee", borderRadius: 2, marginBottom: 5 }}>
-                                  <div style={{ height: "100%", width: barW, background: dc, borderRadius: 2, transition: "width .4s" }} />
-                                </div>
-                                {d.observacao && <div style={{ fontSize: 10, color: C.textDim }}>{d.observacao}</div>}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    {/* Pontos fracos */}
-                    {(qualityReport.pontosFracos || []).length > 0 && (
-                      <div style={{ marginBottom: 14 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: C.red, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Pontos Fracos Identificados</div>
-                        <ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc" }}>
-                          {qualityReport.pontosFracos.map((p, i) => (
-                            <li key={i} style={{ fontSize: 11, color: C.text, marginBottom: 4 }}>{p}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {/* Sugestões de prompt */}
-                    {(qualityReport.sugestoes || []).length > 0 && (
-                      <div>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: C.amber, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Sugestões para o Operador (adicionar ao prompt)</div>
-                        <ul style={{ margin: 0, paddingLeft: 18, listStyle: "none" }}>
-                          {qualityReport.sugestoes.map((s, i) => (
-                            <li key={i} style={{ fontSize: 11, color: C.text, marginBottom: 5, paddingLeft: 12, borderLeft: `2px solid ${C.amber}40` }}>{s}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-
+            <QualityPanel report={qualityReport} loading={loading} onEval={handleQualityEval} hasData={!!hus.length} C={C} />
             <div style={{ display: "flex", gap: 10 }}>
               <button className="btn" onClick={() => setPhase(4)} style={{ background: "transparent", border: `1px solid ${C.muted}`, color: C.textDim }}>← Voltar</button>
               <button className="btn" onClick={() => goToPhase(6)} style={{ background: C.accent + "0e", border: `1px solid ${C.accent}`, color: C.accent }}>
@@ -5481,6 +5392,96 @@ function SectionLabel({ children, color }) {
     <div style={{ fontSize: 10, color: color || "#1e2a40", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
       <div style={{ width: 2, height: 10, borderRadius: 1, background: color || "#1e2a40", flexShrink: 0 }} />
       {children}
+    </div>
+  );
+}
+
+function QualityPanel({ report, loading, onEval, hasData, C }) {
+  return (
+    <div style={{ background: "#f8f9ff", border: `1px solid ${C.accent}30`, borderRadius: 8, padding: "14px 16px", marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: report ? 14 : 0 }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 2 }}>
+            Autocrítica de Qualidade
+          </div>
+          <div style={{ fontSize: 11, color: C.textDim }}>
+            Compara a entrada com os artefatos gerados — chamada única, sem loop.
+          </div>
+        </div>
+        <button
+          onClick={onEval}
+          disabled={loading || !hasData}
+          style={{ flexShrink: 0, marginLeft: 12, cursor: loading || !hasData ? "not-allowed" : "pointer", opacity: loading || !hasData ? 0.4 : 1, background: "#0a0e1a", border: `1px solid ${C.accent}`, color: C.accent, borderRadius: 7, fontFamily: "'Manrope',sans-serif", fontWeight: 700, fontSize: 12, padding: "8px 16px", whiteSpace: "nowrap" }}
+        >
+          {loading ? "Avaliando..." : "🔍 Avaliar Qualidade"}
+        </button>
+      </div>
+      {report && (() => {
+        const score = Number(report.score);
+        const scoreColor = score < 6 ? C.red : score < 8 ? C.amber : C.green;
+        const scoreLabel = score < 6 ? "Abaixo do limiar — revisão necessária" : score < 8 ? "Aceitável — melhorias recomendadas" : "Boa qualidade";
+        return (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", background: scoreColor + "12", border: `2px solid ${scoreColor}40`, borderRadius: 10, padding: "10px 18px", minWidth: 80 }}>
+                <span style={{ fontSize: 28, fontWeight: 800, color: scoreColor, fontFamily: "'Manrope',sans-serif", lineHeight: 1 }}>{score.toFixed(1)}</span>
+                <span style={{ fontSize: 9, color: scoreColor, fontWeight: 600, marginTop: 2 }}>/10</span>
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: scoreColor, marginBottom: 3 }}>{scoreLabel}</div>
+                {score < 6 && (
+                  <div style={{ fontSize: 11, color: C.red, fontWeight: 600 }}>
+                    ⚠ Score abaixo do limiar operacional (6/10). Revise as sugestões abaixo antes de prosseguir.
+                  </div>
+                )}
+              </div>
+            </div>
+            {(report.dimensoes || []).length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>Dimensões</div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  {report.dimensoes.map((d, i) => {
+                    const dn = Number(d.nota);
+                    const dc = dn < 6 ? C.red : dn < 8 ? C.amber : C.green;
+                    return (
+                      <div key={i} style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 6, padding: "8px 12px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: C.textBright }}>
+                            {d.nome}{d.peso ? <span style={{ fontSize: 10, color: C.textDim, fontWeight: 400 }}> ({d.peso}%)</span> : null}
+                          </span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: dc }}>{dn.toFixed(1)}</span>
+                        </div>
+                        <div style={{ height: 4, background: "#eee", borderRadius: 2, marginBottom: 5 }}>
+                          <div style={{ height: "100%", width: `${Math.round((dn / 10) * 100)}%`, background: dc, borderRadius: 2, transition: "width .4s" }} />
+                        </div>
+                        {d.observacao && <div style={{ fontSize: 10, color: C.textDim }}>{d.observacao}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {(report.pontosFracos || []).length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.red, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Pontos Fracos</div>
+                <ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc" }}>
+                  {report.pontosFracos.map((p, i) => <li key={i} style={{ fontSize: 11, color: C.text, marginBottom: 4 }}>{p}</li>)}
+                </ul>
+              </div>
+            )}
+            {(report.sugestoes || []).length > 0 && (
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.amber, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Sugestões para o Operador</div>
+                <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none" }}>
+                  {report.sugestoes.map((s, i) => (
+                    <li key={i} style={{ fontSize: 11, color: C.text, marginBottom: 5, paddingLeft: 12, borderLeft: `2px solid ${C.amber}40` }}>{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
