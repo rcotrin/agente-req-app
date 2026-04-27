@@ -1383,7 +1383,11 @@ function wikiUCFile(uc, husDoUC, ep, modulo) {
     // Merge: refs explícitos + RN por origemPasso + FA/FE que partem deste passo
     const refsSet = new Set([...safeRefs(p.refs), ...(refsByPasso[passoNorm] || []), ...(fafeByPasso[passoNorm] || [])]);
     const refsLinks = [...refsSet]
-      .map(id => `[${id}](#${id.toLowerCase().replace(/[^a-z0-9-]/g, "-")})`)
+      .map(id => {
+        const anchor = id.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+        if (/^MSG\d+$/i.test(id)) return `[${id}](../Mensagens-de-Sistema#${anchor})`;
+        return `[${id}](#${anchor})`;
+      })
       .join(" · ");
     md += `| <a id="${anchorId}"></a>**${passoNorm}** | ${ator} | ${p.descricao} | ${refsLinks || "—"} |\n`;
   });
@@ -1620,7 +1624,7 @@ function wikiMsgFile(ep, ucsEp, modulo) {
   let md = wikiYaml(`Mensagens de Sistema - ${titulo}`, modulo, "mensagens-de-sistema");
   md += `# Mensagens de Sistema - ${titulo}\n\n`;
   md += `## Tabela de Mensagens\n\n| ID | Tipo | Ponto de Origem | Mensagem | Acao Esperada |\n|----|------|-----------------|----------|---------------|\n`;
-  msgs.forEach(m => { md += `| ${m.id} | ${m.tipo} | ${m.contexto} | ${m.mensagem} | ${m.acao} |\n`; });
+  msgs.forEach(m => { md += `| <a id="${m.id.toLowerCase()}"></a>${m.id} | ${m.tipo} | ${m.contexto} | ${m.mensagem} | ${m.acao} |\n`; });
   md += `\n## Legenda\n\n| Tipo | Uso |\n|------|-----|\n`;
   md += `| Sucesso | Operacao concluida com exito |\n`;
   md += `| Alerta | Situacao que requer atencao |\n`;
@@ -1805,7 +1809,7 @@ function wikiCORMSGGlobal(allUCs) {
   let md = wikiYaml("Mensagens de Sistema - COR", "COR", "mensagens-de-sistema");
   md += `# Mensagens de Sistema - COR\n\n`;
   md += `## Tabela de Mensagens\n\n| ID | Tipo | Ponto de Origem | Mensagem | Acao Esperada |\n|----|------|-----------------|----------|---------------|\n`;
-  msgs.forEach(m => { md += `| ${m.id} | ${m.tipo} | ${m.contexto} | ${m.mensagem} | ${m.acao} |\n`; });
+  msgs.forEach(m => { md += `| <a id="${m.id.toLowerCase()}"></a>${m.id} | ${m.tipo} | ${m.contexto} | ${m.mensagem} | ${m.acao} |\n`; });
   md += `\n## Legenda\n\n| Tipo | Uso |\n|------|-----|\n`;
   md += `| Sucesso | Operacao concluida com exito |\n| Alerta | Situacao que requer atencao |\n`;
   md += `| Erro | Falha - requer acao |\n| Informacao | Mensagem neutra |\n| Seguranca | Acesso negado / sessao expirada |\n`;
