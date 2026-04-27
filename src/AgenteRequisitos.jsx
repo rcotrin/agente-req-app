@@ -825,49 +825,86 @@ Retorne SOMENTE JSON:
 // ════════════════════════════════════════════════════════════════════
 
 async function fase5_avaliarQualidade(funcList, epicos, ucs, hus) {
+  // Sem funcList o auditor não consegue avaliar cobertura — retorna aviso em vez de score baixo indevido
+  if (!funcList.length) {
+    return {
+      _semFuncList: true,
+      score: null,
+      pontosFracos: [
+        "funcList indisponível: a lista de funcionalidades extraídas do documento não está na memória desta sessão. " +
+        "Isso impede a avaliação de Cobertura e Rastreabilidade. Reprocesse o documento (botão 'Analisar documento') para restaurá-la.",
+      ],
+      sugestoes: [
+        "Reprocesse o documento original para restaurar funcList e então clique 'Avaliar Qualidade' novamente.",
+      ],
+    };
+  }
+
   const system = `Você é um Auditor de Qualidade de Requisitos sênior com expertise em UML 2.5, ISO/IEC/IEEE 29148 e CMMI REQM.
-Avalie a qualidade dos artefatos de requisitos gerados comparando com as funcionalidades de entrada.
+Avalie a qualidade dos artefatos de requisitos comparando-os com as funcionalidades de entrada fornecidas.
 
 DIMENSÕES DE AVALIAÇÃO (cada uma de 0 a 10):
-1. Cobertura (peso 25%): Quantas funcionalidades de entrada foram transformadas em UCs/HUs? Há funcionalidades perdidas ou agrupadas incorretamente?
-2. Completude (peso 20%): UCs têm gatilho, fluxo principal, fluxos alternativos, exceções? HUs têm regras de negócio e critérios de aceitação concretos (não genéricos)?
-3. Rastreabilidade (peso 20%): Existe ligação clara funcionalidade → épico → UC → HU → critério de aceitação? FuncIds batem com o épico?
-4. Precisão do Domínio (peso 15%): Títulos, nomes e descrições são específicos do negócio (evitam termos genéricos como "o sistema deve processar")? Valores numéricos e nomes de entidades preservados?
-5. Consistência (peso 10%): Nomenclaturas, padrões de ID e atores são consistentes entre todos os artefatos?
-6. Testabilidade (peso 10%): Critérios de aceitação são verificáveis, mensuráveis e não ambíguos?
+1. Cobertura (peso 25%): Cada funcionalidade da lista de entrada está representada em pelo menos um UC/HU?
+   - Cruze os IDs de funcList com os funcIds de cada épico.
+   - Funcionalidades sem correspondência = lacuna de cobertura.
+2. Completude (peso 20%): UCs têm gatilho, fluxo principal (≥3 passos), fluxos alternativos e exceções?
+   - HUs têm "como", "quero", "para" preenchidos? RNs e CAs presentes com texto concreto?
+3. Rastreabilidade (peso 20%): funcId → épico → ftId → reqId → CA — a cadeia é rastreável?
+   - funcIds no épico batem com IDs da funcList? HUs referenciam o ftId correto?
+4. Precisão do Domínio (peso 15%): Títulos e RNs usam terminologia do negócio (não genérica)?
+   - CAs contêm valores mensuráveis (números, estados discretos, prazos) — não frases como "funcionar corretamente"?
+5. Consistência (peso 10%): Padrão de IDs uniforme? Atores nomeados de forma consistente entre UCs?
+6. Testabilidade (peso 10%): CAs são verificáveis por um QA sem ambiguidade?
 
-SCORE FINAL = média ponderada (25%+20%+20%+15%+10%+10%). Seja CRÍTICO — nota ≥ 8 exige excelência comprovada nos dados fornecidos.
-
-Nas sugestoes: escreva instruções concretas de prompt para o operador adicionar na próxima geração.
+SCORE FINAL = média ponderada. Avalie com base EXCLUSIVAMENTE nos dados fornecidos.
+Se uma informação não estiver disponível nos dados, note a ausência na observacao da dimensão — NÃO penalize o score por dado não enviado.
 
 Retorne SOMENTE JSON sem markdown:
-{"score":7.2,"dimensoes":[{"nome":"Cobertura","peso":25,"nota":8.0,"observacao":"string curta max 100 chars"}],"pontosFracos":["string descrevendo problema específico"],"sugestoes":["Adicione ao prompt: instrução concreta de melhoria"]}`;
+{"score":7.2,"dimensoes":[{"nome":"Cobertura","peso":25,"nota":8.0,"observacao":"string específica, max 120 chars"}],"pontosFracos":["problema concreto observado nos dados — cite IDs ou valores reais"],"sugestoes":["Instrução direta para o operador melhorar o próximo ciclo de geração"]}`;
 
-  const ucsSummary = ucs.map(u => ({
-    ftId: u.ftId, titulo: u.titulo, epicId: u.epicId,
-    huCount: hus.filter(h => h.ucId === u.ucId).length,
-    temGatilho: !!u.gatilho,
-    temFluxo: (u.fluxoPrincipal || []).length > 0,
-    temAlternativo: (u.fluxosAlternativos || []).length > 0,
-    temExcecao: (u.fluxosExcecao || []).length > 0,
-  }));
-  const husSummary = hus.map(h => ({
-    reqId: h.reqId, ftId: h.ftId,
-    rnCount: (h.regrasNegocio || []).length,
-    caCount: (h.criteriosAceitacao || []).length,
-    _fallback: h._fallback || false,
-  }));
+  // Épicos: envia funcIds reais (array), não contagem — evita confusão com inteiro
   const epicosSummary = epicos.map(e => ({
     id: e.id, titulo: e.titulo,
-    funcIdsCobertos: (e.funcIds || []).length,
+    funcIds: e.funcIds || [],          // IDs reais das funcionalidades cobertas
     ucCount: ucs.filter(u => u.epicId === e.id).length,
   }));
 
+  // UCs: inclui atores, gatilho e estrutura de fluxo
+  const ucsSummary = ucs.map(u => ({
+    ftId: u.ftId, titulo: u.titulo, epicId: u.epicId,
+    atores: u.atores || [],
+    gatilho: u.gatilho || "",
+    passosFP: (u.fluxoPrincipal || []).length,
+    qtdFA: (u.fluxosAlternativos || []).length,
+    qtdFE: (u.fluxosExcecao || []).length,
+    huCount: hus.filter(h => h.ucId === u.ucId).length,
+  }));
+
+  // HUs: inclui como/quero e amostras reais de RN e CA para avaliação de mensurabilidade
+  const husSummary = hus.map(h => ({
+    reqId: h.reqId, ftId: h.ftId,
+    como: h.como || "",
+    quero: (h.quero || "").slice(0, 80),
+    rnCount: (h.regrasNegocio || []).length,
+    caCount: (h.criteriosAceitacao || []).length,
+    rnSample: (h.regrasNegocio || []).slice(0, 2).map(r => r.descricao?.slice(0, 100) || ""),
+    caSample: (h.criteriosAceitacao || []).slice(0, 2).map(c => c.descricao?.slice(0, 100) || ""),
+    _fallback: h._fallback || false,
+  }));
+
   try {
-    const raw = await claude(
-      `ENTRADA — Funcionalidades identificadas no documento (${funcList.length} itens):\n${JSON.stringify(funcList.map(f => ({ id: f.id, titulo: f.titulo, descricao: f.descricao })), null, 2)}\n\nSAÍDA — Épicos gerados (${epicos.length}):\n${JSON.stringify(epicosSummary, null, 2)}\n\nUCs/Features gerados (${ucs.length}):\n${JSON.stringify(ucsSummary, null, 2)}\n\nHUs/Requisitos gerados (${hus.length}), com fallbacks: ${hus.filter(h => h._fallback).length}:\n${JSON.stringify(husSummary, null, 2)}\n\nAvalie a qualidade dos artefatos gerados.`,
-      system, 3000, "claude-sonnet-4-6", 0
-    );
+    const prompt =
+      `ENTRADA — Funcionalidades do documento (${funcList.length} itens):\n` +
+      JSON.stringify(funcList.map(f => ({ id: f.id, titulo: f.titulo, descricao: (f.descricao || "").slice(0, 120) })), null, 2) +
+      `\n\nSAÍDA — Épicos (${epicos.length}):\n` +
+      JSON.stringify(epicosSummary, null, 2) +
+      `\n\nUCs/Features (${ucs.length}):\n` +
+      JSON.stringify(ucsSummary, null, 2) +
+      `\n\nHUs/Requisitos (${hus.length}), fallbacks: ${hus.filter(h => h._fallback).length}:\n` +
+      JSON.stringify(husSummary, null, 2) +
+      `\n\nAvalie a qualidade. Cite IDs reais nos pontosFracos quando aplicável.`;
+
+    const raw = await claude(prompt, system, 3000, "claude-sonnet-4-6", 0);
     const parsed = safeJSON(raw);
     if (typeof parsed?.score !== "number") throw new Error("JSON inválido ou score ausente");
     console.log(`[fase5_qualidade] score final: ${parsed.score}/10`);
@@ -5417,6 +5454,19 @@ function QualityPanel({ report, loading, onEval, hasData, C }) {
         </button>
       </div>
       {report && (() => {
+        // Caso especial: funcList ausente — mostra aviso em vez de score inválido
+        if (report._semFuncList) {
+          return (
+            <div style={{ background: C.amber + "12", border: `1px solid ${C.amber}40`, borderRadius: 7, padding: "10px 14px" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.amber, marginBottom: 6 }}>⚠ Dados insuficientes para avaliar</div>
+              <div style={{ fontSize: 11, color: C.text, marginBottom: 8 }}>{report.pontosFracos?.[0]}</div>
+              {(report.sugestoes || []).map((s, i) => (
+                <div key={i} style={{ fontSize: 11, color: C.textDim, paddingLeft: 10, borderLeft: `2px solid ${C.amber}40` }}>{s}</div>
+              ))}
+            </div>
+          );
+        }
+
         const score = Number(report.score);
         const scoreColor = score < 6 ? C.red : score < 8 ? C.amber : C.green;
         const scoreLabel = score < 6 ? "Abaixo do limiar — revisão necessária" : score < 8 ? "Aceitável — melhorias recomendadas" : "Boa qualidade";
