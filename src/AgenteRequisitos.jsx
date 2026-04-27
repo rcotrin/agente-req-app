@@ -456,6 +456,12 @@ REGRAS OBRIGATÓRIAS:
 4. Regras de negócio: IDs no padrão "${rn1}", sequencial. "nome": substantivo curto (máx 5 palavras). "descricao": frase completa. "origemPasso": passo FP onde a regra se aplica (ex: "FP-2").
 5. Critérios: id "Critério 01", "Critério 02"...
 6. OBRIGATORIEDADE MÍNIMA: cada HU DEVE ter no mínimo 1 regra de negócio identificada (campo "regrasNegocio" com ao menos 1 item) E no mínimo 1 critério de aceitação concreto e verificável (campo "criteriosAceitacao" com ao menos 1 item). Jamais retorne HU com arrays vazios nesses campos.
+7. FIDELIDADE AO DOMÍNIO (obrigatório — nunca generalize):
+   - Preserve valores numéricos exatos do domínio (ex: 5%, 3 dias úteis, R$ 100,00, 180 dias).
+   - Preserve nomes de tabelas, campos e sistemas exatamente como no documento (ex: TB_CONCILIACAO, STATUS_EXECUCAO, EXEC-AAAAMMDD-NNN, COD_PARCELA).
+   - Preserve enumerações e status de domínio exatos (ex: "PENDENTE", "APROVADO", "LIQUIDADO", "CANCELADO") — nunca generalize para "status" ou "situação".
+   - Preserve padrões de código e formatos de ID exatamente (ex: "B2 AAAAMMDD", "COD-XXXX", "LOTE-NNNN").
+   - Se um valor específico não estiver disponível, use a terminologia do domínio — nunca use palavras genéricas como "valor", "dado", "sistema", "registro" sem qualificação.
 Retorne SOMENTE JSON sem markdown:
 {"hus":[{"reqId":"REQ001","titulo":"string","como":"Usuário com perfil X","quero":"realizar ação Y","para":"obter benefício Z","regrasNegocio":[{"id":"${rn1}","nome":"Nome Curto","descricao":"Descrição da regra","origemPasso":"FP-2"}],"criteriosAceitacao":[{"id":"Critério 01","descricao":"string"}],"workItem":{"titulo":"string","descricao":"string","criteriosAceitacao":"string","tags":["string"]}}]}`;
   const corrNote = correction ? `\n\n⚠ CORREÇÃO SOLICITADA PELO ANALISTA: ${correction}` : "";
@@ -813,6 +819,66 @@ Retorne SOMENTE JSON:
 }
 
 // ════════════════════════════════════════════════════════════════════
+// FASE 5 — Avaliação de Qualidade (autocrítica única — sem loop)
+// Uma chamada LLM compara funcList de entrada vs artefatos gerados.
+// Score 0–10 com breakdown por dimensão. Limiar operacional: 6/10.
+// ════════════════════════════════════════════════════════════════════
+
+async function fase5_avaliarQualidade(funcList, epicos, ucs, hus) {
+  const system = `Você é um Auditor de Qualidade de Requisitos sênior com expertise em UML 2.5, ISO/IEC/IEEE 29148 e CMMI REQM.
+Avalie a qualidade dos artefatos de requisitos gerados comparando com as funcionalidades de entrada.
+
+DIMENSÕES DE AVALIAÇÃO (cada uma de 0 a 10):
+1. Cobertura (peso 25%): Quantas funcionalidades de entrada foram transformadas em UCs/HUs? Há funcionalidades perdidas ou agrupadas incorretamente?
+2. Completude (peso 20%): UCs têm gatilho, fluxo principal, fluxos alternativos, exceções? HUs têm regras de negócio e critérios de aceitação concretos (não genéricos)?
+3. Rastreabilidade (peso 20%): Existe ligação clara funcionalidade → épico → UC → HU → critério de aceitação? FuncIds batem com o épico?
+4. Precisão do Domínio (peso 15%): Títulos, nomes e descrições são específicos do negócio (evitam termos genéricos como "o sistema deve processar")? Valores numéricos e nomes de entidades preservados?
+5. Consistência (peso 10%): Nomenclaturas, padrões de ID e atores são consistentes entre todos os artefatos?
+6. Testabilidade (peso 10%): Critérios de aceitação são verificáveis, mensuráveis e não ambíguos?
+
+SCORE FINAL = média ponderada (25%+20%+20%+15%+10%+10%). Seja CRÍTICO — nota ≥ 8 exige excelência comprovada nos dados fornecidos.
+
+Nas sugestoes: escreva instruções concretas de prompt para o operador adicionar na próxima geração.
+
+Retorne SOMENTE JSON sem markdown:
+{"score":7.2,"dimensoes":[{"nome":"Cobertura","peso":25,"nota":8.0,"observacao":"string curta max 100 chars"}],"pontosFracos":["string descrevendo problema específico"],"sugestoes":["Adicione ao prompt: instrução concreta de melhoria"]}`;
+
+  const ucsSummary = ucs.map(u => ({
+    ftId: u.ftId, titulo: u.titulo, epicId: u.epicId,
+    huCount: hus.filter(h => h.ucId === u.ucId).length,
+    temGatilho: !!u.gatilho,
+    temFluxo: (u.fluxoPrincipal || []).length > 0,
+    temAlternativo: (u.fluxosAlternativos || []).length > 0,
+    temExcecao: (u.fluxosExcecao || []).length > 0,
+  }));
+  const husSummary = hus.map(h => ({
+    reqId: h.reqId, ftId: h.ftId,
+    rnCount: (h.regrasNegocio || []).length,
+    caCount: (h.criteriosAceitacao || []).length,
+    _fallback: h._fallback || false,
+  }));
+  const epicosSummary = epicos.map(e => ({
+    id: e.id, titulo: e.titulo,
+    funcIdsCobertos: (e.funcIds || []).length,
+    ucCount: ucs.filter(u => u.epicId === e.id).length,
+  }));
+
+  try {
+    const raw = await claude(
+      `ENTRADA — Funcionalidades identificadas no documento (${funcList.length} itens):\n${JSON.stringify(funcList.map(f => ({ id: f.id, titulo: f.titulo, descricao: f.descricao })), null, 2)}\n\nSAÍDA — Épicos gerados (${epicos.length}):\n${JSON.stringify(epicosSummary, null, 2)}\n\nUCs/Features gerados (${ucs.length}):\n${JSON.stringify(ucsSummary, null, 2)}\n\nHUs/Requisitos gerados (${hus.length}), com fallbacks: ${hus.filter(h => h._fallback).length}:\n${JSON.stringify(husSummary, null, 2)}\n\nAvalie a qualidade dos artefatos gerados.`,
+      system, 3000, "claude-sonnet-4-6", 0
+    );
+    const parsed = safeJSON(raw);
+    if (typeof parsed?.score !== "number") throw new Error("JSON inválido ou score ausente");
+    console.log(`[fase5_qualidade] score final: ${parsed.score}/10`);
+    return parsed;
+  } catch (e) {
+    console.warn(`[fase5_qualidade] falhou (${e.message})`);
+    return null;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
 // FILE READING
 // ════════════════════════════════════════════════════════════════════
 
@@ -1154,8 +1220,13 @@ function wikiUCFile(uc, husDoUC, ep, modulo) {
   let md = wikiYaml(titulo, modulo, "caso-de-uso");
   md += `# ${titulo}\n\n**Modulo:** ${ep.titulo}\n\n---\n\n`;
 
-  // 1. Descrição
-  md += `## 1. Descricao\n\n> ${uc.titulo}${ep.objetivo ? ` — ${ep.objetivo}` : ""}\n\n`;
+  // 1. Descrição — derivada dos campos do próprio UC, não do objetivo genérico do épico
+  const ucDesc = uc.gatilho
+    ? `${uc.titulo}. ${uc.gatilho}`
+    : (uc.precondição
+      ? `${uc.titulo}. Contexto: ${uc.precondição.split(/[.;]/)[0].trim()}.`
+      : uc.titulo);
+  md += `## 1. Descricao\n\n> ${ucDesc}\n\n`;
 
   // 2. Atores
   md += `## 2. Atores\n\n| Ator | Tipo | Descricao |\n|------|------|----------|\n`;
@@ -1434,7 +1505,9 @@ function extractMsgsFromUCs(ucsEp) {
         const origemLink = origemNorm4
           ? `[${uc.ftId} ${origemNorm4}](Casos-de-Uso/${ucSlug}#${origemNorm4.toLowerCase()})`
           : `${uc.ftId} — ${e.id}`;
-        msgs.push({ id: `MSG${String(msgIdx++).padStart(3, "0")}`, tipo, contexto: origemLink, mensagem: e.mensagem, acao });
+        // Strip original MSG ID prefix from message text to avoid "MSG001 contains MSG006" confusion
+        const cleanMensagem = (e.mensagem || "").replace(/^MSG\d+\s*[-–—:]\s*/i, "").trim();
+        msgs.push({ id: `MSG${String(msgIdx++).padStart(3, "0")}`, tipo, contexto: origemLink, mensagem: cleanMensagem || e.mensagem, acao });
       }
     });
   });
@@ -1763,6 +1836,32 @@ function wikiPadroesConvencoes() {
 }
 
 // ── Orquestrador: gera todos os arquivos por épico ───────────────
+// Detecta linhas de tabela que contêm valores placeholder óbvios e adiciona marcador visual.
+// Só examina linhas de tabela (| ... |) para evitar falsos positivos em texto narrativo.
+function markPlaceholders(content) {
+  const PLACEHOLDER_PATTERNS = [
+    /\|\s*RN\d{3}\s*\|\s*Nome da Regra\s*\|\s*Descricao objetiva/i,
+    /\|\s*RF[-\w]*001\s*\|\s*O sistema deve\.\.\./i,
+    /\|\s*RNF[-\w]*001\s*\|\s*Performance/i,
+    /\|\s*MSG\d{3}\s*\|\s*Sucesso\s*\|\s*—\s*\|\s*Operacao realizada com sucesso\./i,
+    /\|\s*FT\d{3}\s*\|\s*Nome da Feature\s*\|\s*Proposto/i,
+    /\|\s*UC\d{3}\s*\|\s*A definir/i,
+  ];
+  let warnings = 0;
+  const marked = content.split("\n").map(line => {
+    if (line.startsWith("|") && PLACEHOLDER_PATTERNS.some(p => p.test(line))) {
+      warnings++;
+      return line.trimEnd() + " ⚠ _placeholder_";
+    }
+    return line;
+  }).join("\n");
+  if (warnings > 0) {
+    const banner = `> ⚠ **${warnings} campo(s) placeholder** detectado(s) neste arquivo — revise antes de publicar.\n\n`;
+    return marked.replace(/^(---\n\n)?/, `$1${banner}`);
+  }
+  return marked;
+}
+
 function generateWikiFiles(epicos, ucs, hus, wikiRoot, produtoTitulo, isCOR) {
   const files = [];
   const corEp  = epicos.find(e => e.id === "COR");
@@ -1807,23 +1906,27 @@ function generateWikiFiles(epicos, ucs, hus, wikiRoot, produtoTitulo, isCOR) {
   const globalHUs = isCOR ? hus : corHUs;
   const globalUCs = isCOR ? ucs : corUCs;
 
-  files.push({ path: `${corBase}/COR.md`,                          content: wikiCORIndex() });
+  const mp = markPlaceholders;
+
+  files.push({ path: `${corBase}/COR.md`,                          content: mp(wikiCORIndex()) });
   files.push({ path: `${corBase}/Casos-de-Uso/Casos-de-Uso.md`,    content: wikiCORUCIndex(corUCs) });
-  files.push({ path: `${corBase}/Regras-de-Negocio-Globais.md`,    content: wikiCORRNGlobal(globalHUs, globalUCs) });
-  files.push({ path: `${corBase}/Mensagens-de-Sistema-Globais.md`, content: wikiCORMSGGlobal(globalUCs) });
-  files.push({ path: `${corBase}/Requisitos-Funcionais-Globais.md`, content: wikiCORRFGlobal(globalUCs, globalHUs) });
-  files.push({ path: `${corBase}/Requisitos-Nao-Funcionais.md`,    content: wikiCORRNF(globalUCs) });
+  files.push({ path: `${corBase}/Regras-de-Negocio-Globais.md`,    content: mp(wikiCORRNGlobal(globalHUs, globalUCs)) });
+  files.push({ path: `${corBase}/Mensagens-de-Sistema-Globais.md`, content: mp(wikiCORMSGGlobal(globalUCs)) });
+  files.push({ path: `${corBase}/Requisitos-Funcionais-Globais.md`, content: mp(wikiCORRFGlobal(globalUCs, globalHUs)) });
+  files.push({ path: `${corBase}/Requisitos-Nao-Funcionais.md`,    content: mp(wikiCORRNF(globalUCs)) });
   files.push({ path: `${corBase}/Arquitetura-Geral.md`,            content: wikiArquiteturaGeral(epicos) });
   files.push({ path: `${corBase}/Glossario.md`,                    content: wikiGlossario(epicos) });
   files.push({ path: `${corBase}/Padroes-e-Convencoes.md`,         content: wikiPadroesConvencoes() });
-  files.push({ path: `${corBase}/.order`,                          content: corInternalOrder.join("\n") });
+  files.push({ path: `${corBase}/RELATORIO-COBERTURA.md`,          content: wikiRelatorioCobertura(epicos, ucs, hus) });
+  files.push({ path: `${corBase}/MATRIZ-RASTREABILIDADE.md`,       content: wikiMatrizRastreabilidade(ucs, hus) });
+  files.push({ path: `${corBase}/.order`,                          content: [...corInternalOrder, "RELATORIO-COBERTURA", "MATRIZ-RASTREABILIDADE"].join("\n") });
 
   // COR UCs individuais
   const corUCOrder = ["Casos-de-Uso"];
   for (const uc of corUCs) {
     const slug = `${uc.ftId}-${toSlug(uc.titulo)}`;
     corUCOrder.push(slug);
-    files.push({ path: `${corBase}/Casos-de-Uso/${slug}.md`, content: wikiUCFile(uc, hus.filter(h => h.ucId === uc.ucId), corEp || { id: "COR", titulo: "COR - Funcionalidades Transversais" }, "COR") });
+    files.push({ path: `${corBase}/Casos-de-Uso/${slug}.md`, content: mp(wikiUCFile(uc, hus.filter(h => h.ucId === uc.ucId), corEp || { id: "COR", titulo: "COR - Funcionalidades Transversais" }, "COR")) });
   }
   files.push({ path: `${corBase}/Casos-de-Uso/.order`, content: corUCOrder.join("\n") });
 
@@ -1837,24 +1940,129 @@ function generateWikiFiles(epicos, ucs, hus, wikiRoot, produtoTitulo, isCOR) {
     const husEp  = hus.filter(h => h.epicId === ep.id);
     const base   = `${modRoot}/${modulo}`;
 
-    files.push({ path: `${base}/${modulo}.md`,                  content: wikiModuleIndex(ep, ucsEp, modulo) });
+    files.push({ path: `${base}/${modulo}.md`,                  content: mp(wikiModuleIndex(ep, ucsEp, modulo)) });
     files.push({ path: `${base}/Casos-de-Uso/Casos-de-Uso.md`,  content: wikiUCIndex(ep, ucsEp, modulo) });
-    files.push({ path: `${base}/Regras-de-Negocio.md`,           content: wikiRNFile(ep, ucsEp, husEp, modulo) });
-    files.push({ path: `${base}/Mensagens-de-Sistema.md`,        content: wikiMsgFile(ep, ucsEp, modulo) });
-    files.push({ path: `${base}/Requisitos-Funcionais.md`,       content: wikiRFFile(ep, ucsEp, husEp, modulo) });
-    files.push({ path: `${base}/Requisitos-Nao-Funcionais.md`,   content: wikiRNFFile(ep, ucsEp, modulo) });
+    files.push({ path: `${base}/Regras-de-Negocio.md`,           content: mp(wikiRNFile(ep, ucsEp, husEp, modulo)) });
+    files.push({ path: `${base}/Mensagens-de-Sistema.md`,        content: mp(wikiMsgFile(ep, ucsEp, modulo)) });
+    files.push({ path: `${base}/Requisitos-Funcionais.md`,       content: mp(wikiRFFile(ep, ucsEp, husEp, modulo)) });
+    files.push({ path: `${base}/Requisitos-Nao-Funcionais.md`,   content: mp(wikiRNFFile(ep, ucsEp, modulo)) });
     files.push({ path: `${base}/.order`, content: [modulo, "Casos-de-Uso", "Regras-de-Negocio", "Mensagens-de-Sistema", "Requisitos-Funcionais", "Requisitos-Nao-Funcionais"].join("\n") });
 
     const ucOrder = ["Casos-de-Uso"];
     for (const uc of ucsEp) {
       const slug = `${uc.ftId}-${toSlug(uc.titulo)}`;
       ucOrder.push(slug);
-      files.push({ path: `${base}/Casos-de-Uso/${slug}.md`, content: wikiUCFile(uc, hus.filter(h => h.ucId === uc.ucId), ep, modulo) });
+      files.push({ path: `${base}/Casos-de-Uso/${slug}.md`, content: mp(wikiUCFile(uc, hus.filter(h => h.ucId === uc.ucId), ep, modulo)) });
     }
     files.push({ path: `${base}/Casos-de-Uso/.order`, content: ucOrder.join("\n") });
   }
 
   return files;
+}
+
+// ── M-08: Relatório de Cobertura ─────────────────────────────────
+function wikiRelatorioCobertura(epicos, ucs, hus) {
+  let md = wikiYaml("RELATORIO-COBERTURA", "COR", "relatorio");
+  md += `# Relatório de Cobertura de Requisitos\n\n`;
+  md += `> Gerado automaticamente pelo Agente de Requisitos. Revisão manual necessária.\n\n`;
+
+  // Cobertura por épico
+  md += `## Cobertura por Épico\n\n| Épico | Features (UCs) | Requisitos (HUs) | HUs Fallback | Status |\n|-------|---------------|-----------------|-------------|--------|\n`;
+  for (const ep of epicos) {
+    const ucsEp = ucs.filter(u => u.epicId === ep.id);
+    const husEp = hus.filter(h => h.epicId === ep.id);
+    const fallbacks = husEp.filter(h => h._fallback).length;
+    const status = ucsEp.length === 0 ? "⚠ Sem UCs" : fallbacks > 0 ? "⚠ Revisar" : "✓ OK";
+    md += `| ${ep.id} — ${ep.titulo} | ${ucsEp.length} | ${husEp.length} | ${fallbacks || "—"} | ${status} |\n`;
+  }
+  md += "\n";
+
+  // Completude de HUs
+  const husIncompletas = hus.filter(h => !(h.regrasNegocio||[]).length || !(h.criteriosAceitacao||[]).length || h._fallback);
+  if (husIncompletas.length) {
+    md += `## HUs com Lacunas (${husIncompletas.length})\n\n| ID | Título | Problema |\n|----|--------|----------|\n`;
+    husIncompletas.forEach(h => {
+      const sem = [];
+      if (!(h.regrasNegocio||[]).length) sem.push("sem RN");
+      if (!(h.criteriosAceitacao||[]).length) sem.push("sem CA");
+      if (h._fallback) sem.push("fallback");
+      md += `| ${h.reqId} | ${h.titulo} | ${sem.join(", ")} |\n`;
+    });
+    md += "\n";
+  }
+
+  // UCs sem HUs
+  const ucsSemHU = ucs.filter(u => !hus.some(h => h.ucId === u.ucId));
+  if (ucsSemHU.length) {
+    md += `## Features (UCs) Sem Requisitos\n\n`;
+    ucsSemHU.forEach(u => { md += `- **${u.ftId}** — ${u.titulo} (épico: ${u.epicId})\n`; });
+    md += "\n";
+  }
+
+  // Estatísticas gerais
+  const totalRNs = hus.reduce((s, h) => s + (h.regrasNegocio||[]).length, 0);
+  const totalCAs = hus.reduce((s, h) => s + (h.criteriosAceitacao||[]).length, 0);
+  md += `## Estatísticas Gerais\n\n| Métrica | Valor |\n|---------|-------|\n`;
+  md += `| Épicos | ${epicos.length} |\n`;
+  md += `| Features/UCs | ${ucs.length} |\n`;
+  md += `| Requisitos/HUs | ${hus.length} |\n`;
+  md += `| HUs com fallback | ${hus.filter(h => h._fallback).length} |\n`;
+  md += `| Total de Regras de Negócio | ${totalRNs} |\n`;
+  md += `| Total de Critérios de Aceitação | ${totalCAs} |\n`;
+  md += `| Média RNs/HU | ${hus.length ? (totalRNs / hus.length).toFixed(1) : "—"} |\n`;
+  md += `| Média CAs/HU | ${hus.length ? (totalCAs / hus.length).toFixed(1) : "—"} |\n`;
+
+  return md + wikiHistorico();
+}
+
+// ── M-09: Matriz de Rastreabilidade ──────────────────────────────
+function wikiMatrizRastreabilidade(ucs, hus) {
+  let md = wikiYaml("MATRIZ-RASTREABILIDADE", "COR", "rastreabilidade");
+  md += `# Matriz de Rastreabilidade\n\n`;
+  md += `> Rastreabilidade bidirecional entre Features, Requisitos, Regras de Negócio e Critérios.\n\n`;
+
+  md += `## Feature × Requisito × Regras de Negócio\n\n| Feature (UC) | Requisito (HU) | Regras de Negócio | Critérios de Aceitação |\n|-------------|---------------|------------------|----------------------|\n`;
+  for (const uc of ucs) {
+    const husUC = hus.filter(h => h.ucId === uc.ucId);
+    if (!husUC.length) {
+      md += `| **${uc.ftId}** ${uc.titulo} | — | — | — |\n`;
+      continue;
+    }
+    husUC.forEach((h, i) => {
+      const rnIds = (h.regrasNegocio || []).map(r => r.id).join(", ") || "—";
+      const caCount = (h.criteriosAceitacao || []).length;
+      const ftCol = i === 0 ? `**${uc.ftId}** ${uc.titulo}` : "↑";
+      md += `| ${ftCol} | ${h.reqId} | ${rnIds} | ${caCount} critério(s) |\n`;
+    });
+  }
+  md += "\n";
+
+  // RF × UC
+  const allRFs = ucs.flatMap(u => (u.requisitosFuncionais || []).map(rf => ({ ...rf, ucFtId: u.ftId, ucTitulo: u.titulo })));
+  if (allRFs.length) {
+    md += `## Requisito Funcional × Features Cobertas\n\n| RF | Descrição (resumo) | Features Cobertas |\n|----|--------------------|-------------------|\n`;
+    allRFs.forEach(rf => {
+      const refs = (rf.ucRefs || [rf.ucFtId]).join(", ");
+      md += `| ${rf.id} | ${(rf.descricao || "").slice(0, 70)} | ${refs} |\n`;
+    });
+    md += "\n";
+  }
+
+  // Índice de RNs
+  const allRNs = [];
+  const rnSeen = new Set();
+  hus.forEach(h => (h.regrasNegocio || []).forEach(r => {
+    if (!rnSeen.has(r.id)) { rnSeen.add(r.id); allRNs.push({ ...r, reqId: h.reqId, ftId: h.ftId }); }
+  }));
+  if (allRNs.length) {
+    md += `## Índice de Regras de Negócio\n\n| RN | Nome | Requisito (HU) | Feature (UC) |\n|----|------|---------------|-------------|\n`;
+    allRNs.forEach(r => {
+      md += `| ${r.id} | ${r.nome || "—"} | ${r.reqId} | ${r.ftId} |\n`;
+    });
+    md += "\n";
+  }
+
+  return md + wikiHistorico();
 }
 
 // Infere nome semântico de uma RN a partir da descrição
@@ -2178,6 +2386,7 @@ export default function AgenteRequisitos() {
   const [corrUCs, setCorrUCs]         = useState("");
   const [corrHUs, setCorrHUs]         = useState("");
   const [corrCTs, setCorrCTs]         = useState("");
+  const [qualityReport, setQualityReport] = useState(null);
   const [azWikiRepo,   setAzWikiRepo]   = useState("");
   const [azWikiBranch, setAzWikiBranch] = useState("main");
   const [azWikiRoot,   setAzWikiRoot]   = useState("documentacao");
@@ -2341,6 +2550,21 @@ export default function AgenteRequisitos() {
       }
       if (!result.length) throw new Error(`Nenhuma Feature (UC) gerada.${erros.length ? " Erros: " + erros.join("; ") : ""}`);
       if (erros.length) log(`⚠ ${erros.length} épico(s) com falha: ${erros.join(", ")} — continuando com ${result.length} UCs`);
+
+      // M-01/M-11: validação de cobertura — funcIds de funcList vs cobertos pelos épicos
+      const allFuncIds = new Set(funcList.map(f => f.id));
+      const coveredFuncIds = new Set(epicos.flatMap(e => e.funcIds || []));
+      const uncovered = [...allFuncIds].filter(id => !coveredFuncIds.has(id));
+      if (uncovered.length > 0) {
+        const uncoveredTitles = uncovered.map(id => {
+          const f = funcList.find(x => x.id === id);
+          return f ? `${id}: ${f.titulo}` : id;
+        });
+        log(`⚠ COBERTURA: ${uncovered.length} funcionalidade(s) não atribuídas a nenhum épico: ${uncoveredTitles.join("; ")}`);
+      } else {
+        log(`✓ Cobertura: todas as ${allFuncIds.size} funcionalidades estão atribuídas a épicos.`);
+      }
+
       setUcs(result);
       goToPhase(3);
     } catch (e) { setErr(e.message, e); }
@@ -2481,6 +2705,20 @@ export default function AgenteRequisitos() {
       setCorrCTs("");
     } catch (e) { setErr(e.message, e); }
     finally { setLoading(false); setLoadMsg(""); setProgress({ cur: 0, total: 0 }); }
+  }
+
+  // ── Avaliação de Qualidade (chamada única, sem loop) ─────────────
+  async function handleQualityEval() {
+    setError(""); setLoading(true);
+    try {
+      log("🔍 Avaliando qualidade dos artefatos gerados (chamada única)...");
+      const report = await fase5_avaliarQualidade(funcList, epicos, ucs, hus);
+      if (!report) throw new Error("Não foi possível gerar o relatório de qualidade. Verifique os logs.");
+      setQualityReport(report);
+      const nota = Number(report.score).toFixed(1);
+      log(`✓ Avaliação concluída: ${nota}/10 — ${report.pontosFracos?.length || 0} ponto(s) fraco(s) identificado(s).`);
+    } catch (e) { setErr(e.message, e); }
+    finally { setLoading(false); setLoadMsg(""); }
   }
 
   // ── Auditoria de Referências — corrigir lacunas e remover órfãos ─
@@ -3551,6 +3789,98 @@ export default function AgenteRequisitos() {
               onRegenerate={handleCorrectCTs} loading={loading}
               label="Casos de Teste precisam de ajuste? Descreva a correção e regere."
             />
+
+            {/* ── Avaliação de Qualidade ── */}
+            <div style={{ background: "#f8f9ff", border: `1px solid ${C.accent}30`, borderRadius: 8, padding: "14px 16px", marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: qualityReport ? 14 : 0 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 2 }}>
+                    Autocrítica de Qualidade
+                  </div>
+                  <div style={{ fontSize: 11, color: C.textDim }}>
+                    Compara a entrada com os artefatos gerados — chamada única, sem loop.
+                  </div>
+                </div>
+                <button
+                  onClick={handleQualityEval}
+                  disabled={loading || !hus.length}
+                  style={{ flexShrink: 0, marginLeft: 12, cursor: loading || !hus.length ? "not-allowed" : "pointer", opacity: loading || !hus.length ? 0.4 : 1, background: "#0a0e1a", border: `1px solid ${C.accent}`, color: C.accent, borderRadius: 7, fontFamily: "'Manrope',sans-serif", fontWeight: 700, fontSize: 12, padding: "8px 16px", whiteSpace: "nowrap" }}
+                >
+                  {loading ? "Avaliando..." : "🔍 Avaliar Qualidade"}
+                </button>
+              </div>
+              {qualityReport && (() => {
+                const score = Number(qualityReport.score);
+                const scoreColor = score < 6 ? C.red : score < 8 ? C.amber : C.green;
+                const scoreLabel = score < 6 ? "Abaixo do limiar — revisão necessária" : score < 8 ? "Aceitável — melhorias recomendadas" : "Boa qualidade";
+                return (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", background: scoreColor + "12", border: `2px solid ${scoreColor}40`, borderRadius: 10, padding: "10px 18px", minWidth: 80 }}>
+                        <span style={{ fontSize: 28, fontWeight: 800, color: scoreColor, fontFamily: "'Manrope',sans-serif", lineHeight: 1 }}>{score.toFixed(1)}</span>
+                        <span style={{ fontSize: 9, color: scoreColor, fontWeight: 600, marginTop: 2 }}>/10</span>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: scoreColor, marginBottom: 3 }}>{scoreLabel}</div>
+                        {score < 6 && (
+                          <div style={{ fontSize: 11, color: C.red, fontWeight: 600 }}>
+                            ⚠ Score abaixo do limiar operacional (6/10). Revise as sugestões abaixo antes de prosseguir.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Dimensões */}
+                    {(qualityReport.dimensoes || []).length > 0 && (
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>Dimensões</div>
+                        <div style={{ display: "grid", gap: 6 }}>
+                          {qualityReport.dimensoes.map((d, i) => {
+                            const dn = Number(d.nota);
+                            const dc = dn < 6 ? C.red : dn < 8 ? C.amber : C.green;
+                            const barW = `${Math.round((dn / 10) * 100)}%`;
+                            return (
+                              <div key={i} style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 6, padding: "8px 12px" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                                  <span style={{ fontSize: 11, fontWeight: 600, color: C.textBright }}>{d.nome} {d.peso ? <span style={{ fontSize: 10, color: C.textDim, fontWeight: 400 }}>({d.peso}%)</span> : null}</span>
+                                  <span style={{ fontSize: 12, fontWeight: 700, color: dc }}>{dn.toFixed(1)}</span>
+                                </div>
+                                <div style={{ height: 4, background: "#eee", borderRadius: 2, marginBottom: 5 }}>
+                                  <div style={{ height: "100%", width: barW, background: dc, borderRadius: 2, transition: "width .4s" }} />
+                                </div>
+                                {d.observacao && <div style={{ fontSize: 10, color: C.textDim }}>{d.observacao}</div>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    {/* Pontos fracos */}
+                    {(qualityReport.pontosFracos || []).length > 0 && (
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: C.red, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Pontos Fracos Identificados</div>
+                        <ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc" }}>
+                          {qualityReport.pontosFracos.map((p, i) => (
+                            <li key={i} style={{ fontSize: 11, color: C.text, marginBottom: 4 }}>{p}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {/* Sugestões de prompt */}
+                    {(qualityReport.sugestoes || []).length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: C.amber, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Sugestões para o Operador (adicionar ao prompt)</div>
+                        <ul style={{ margin: 0, paddingLeft: 18, listStyle: "none" }}>
+                          {qualityReport.sugestoes.map((s, i) => (
+                            <li key={i} style={{ fontSize: 11, color: C.text, marginBottom: 5, paddingLeft: 12, borderLeft: `2px solid ${C.amber}40` }}>{s}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
             <div style={{ display: "flex", gap: 10 }}>
               <button className="btn" onClick={() => setPhase(4)} style={{ background: "transparent", border: `1px solid ${C.muted}`, color: C.textDim }}>← Voltar</button>
               <button className="btn" onClick={() => goToPhase(6)} style={{ background: C.accent + "0e", border: `1px solid ${C.accent}`, color: C.accent }}>
