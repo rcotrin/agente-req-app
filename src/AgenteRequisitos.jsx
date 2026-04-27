@@ -1,10 +1,27 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 // import { buildIndex, queryIndex } from "./rag.js"; // RAG desativado
 
-const STORAGE_KEY = "agente_req_v1";
+const STORAGE_KEY    = "agente_req_v1";
+const FUNCLIST_KEY   = "agente_req_funclist_v1"; // chave dedicada — nunca descartada pelo fallback
+
 function loadSaved() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
   catch { return {}; }
+}
+
+// Carrega funcList: tenta storage principal, cai na chave dedicada se ausente/vazio
+function loadFuncListPersisted() {
+  try {
+    const main = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    if (Array.isArray(main.funcList) && main.funcList.length) return main.funcList;
+    const backup = JSON.parse(localStorage.getItem(FUNCLIST_KEY) || "[]");
+    return Array.isArray(backup) ? backup : [];
+  } catch { return []; }
+}
+
+function saveFuncListBackup(list) {
+  if (!list?.length) return;
+  try { localStorage.setItem(FUNCLIST_KEY, JSON.stringify(list)); } catch {}
 }
 
 let _apiKey = "";
@@ -2360,7 +2377,7 @@ export default function AgenteRequisitos() {
   const [isCOR, setIsCOR]               = useState(_s.isCOR ?? false);
   const [file, setFile]           = useState(null);
   const [chunks, setChunks]     = useState(_s.chunks ?? []);
-  const [funcList, setFuncList] = useState(_s.funcList ?? []);
+  const [funcList, setFuncList] = useState(() => loadFuncListPersisted());
   const [domainModel, setDomainModel] = useState(_s.domainModel ?? null);
   const [esqueleto, setEsqueleto]     = useState(_s.esqueleto ?? null);
   const [epicos, setEpicos]     = useState(_s.epicos ?? []);
@@ -2404,6 +2421,9 @@ export default function AgenteRequisitos() {
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); return true; }
       catch { return false; }
     };
+    // Sempre salva funcList na chave dedicada antes do fallback remover do storage principal
+    saveFuncListBackup(funcList);
+
     if (!trySet(base)) {
       const { chunks: _c, ...sem_chunks } = base;
       if (!trySet(sem_chunks)) {
