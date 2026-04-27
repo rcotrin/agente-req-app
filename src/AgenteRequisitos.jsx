@@ -1930,30 +1930,6 @@ function wikiPadroesConvencoes() {
 // ── Orquestrador: gera todos os arquivos por épico ───────────────
 // Detecta linhas de tabela que contêm valores placeholder óbvios e adiciona marcador visual.
 // Só examina linhas de tabela (| ... |) para evitar falsos positivos em texto narrativo.
-function markPlaceholders(content) {
-  const PLACEHOLDER_PATTERNS = [
-    /\|\s*RN\d{3}\s*\|\s*Nome da Regra\s*\|\s*Descricao objetiva/i,
-    /\|\s*RF[-\w]*001\s*\|\s*O sistema deve\.\.\./i,
-    /\|\s*RNF[-\w]*001\s*\|\s*Performance/i,
-    /\|\s*MSG\d{3}\s*\|\s*Sucesso\s*\|\s*—\s*\|\s*Operacao realizada com sucesso\./i,
-    /\|\s*FT\d{3}\s*\|\s*Nome da Feature\s*\|\s*Proposto/i,
-    /\|\s*UC\d{3}\s*\|\s*A definir/i,
-  ];
-  let warnings = 0;
-  const marked = content.split("\n").map(line => {
-    if (line.startsWith("|") && PLACEHOLDER_PATTERNS.some(p => p.test(line))) {
-      warnings++;
-      return line.trimEnd() + " ⚠ _placeholder_";
-    }
-    return line;
-  }).join("\n");
-  if (warnings > 0) {
-    const banner = `> ⚠ **${warnings} campo(s) placeholder** detectado(s) neste arquivo — revise antes de publicar.\n\n`;
-    return marked.replace(/^(---\n\n)?/, `$1${banner}`);
-  }
-  return marked;
-}
-
 function generateWikiFiles(epicos, ucs, hus, wikiRoot, produtoTitulo, isCOR) {
   const files = [];
   const corEp  = epicos.find(e => e.id === "COR");
@@ -1998,14 +1974,12 @@ function generateWikiFiles(epicos, ucs, hus, wikiRoot, produtoTitulo, isCOR) {
   const globalHUs = isCOR ? hus : corHUs;
   const globalUCs = isCOR ? ucs : corUCs;
 
-  const mp = markPlaceholders;
-
-  files.push({ path: `${corBase}/COR.md`,                          content: mp(wikiCORIndex()) });
+  files.push({ path: `${corBase}/COR.md`,                          content: wikiCORIndex() });
   files.push({ path: `${corBase}/Casos-de-Uso/Casos-de-Uso.md`,    content: wikiCORUCIndex(corUCs) });
-  files.push({ path: `${corBase}/Regras-de-Negocio-Globais.md`,    content: mp(wikiCORRNGlobal(globalHUs, globalUCs)) });
-  files.push({ path: `${corBase}/Mensagens-de-Sistema-Globais.md`, content: mp(wikiCORMSGGlobal(globalUCs)) });
-  files.push({ path: `${corBase}/Requisitos-Funcionais-Globais.md`, content: mp(wikiCORRFGlobal(globalUCs, globalHUs)) });
-  files.push({ path: `${corBase}/Requisitos-Nao-Funcionais.md`,    content: mp(wikiCORRNF(globalUCs)) });
+  files.push({ path: `${corBase}/Regras-de-Negocio-Globais.md`,    content: wikiCORRNGlobal(globalHUs, globalUCs) });
+  files.push({ path: `${corBase}/Mensagens-de-Sistema-Globais.md`, content: wikiCORMSGGlobal(globalUCs) });
+  files.push({ path: `${corBase}/Requisitos-Funcionais-Globais.md`, content: wikiCORRFGlobal(globalUCs, globalHUs) });
+  files.push({ path: `${corBase}/Requisitos-Nao-Funcionais.md`,    content: wikiCORRNF(globalUCs) });
   files.push({ path: `${corBase}/Arquitetura-Geral.md`,            content: wikiArquiteturaGeral(epicos) });
   files.push({ path: `${corBase}/Glossario.md`,                    content: wikiGlossario(epicos) });
   files.push({ path: `${corBase}/Padroes-e-Convencoes.md`,         content: wikiPadroesConvencoes() });
@@ -2018,7 +1992,7 @@ function generateWikiFiles(epicos, ucs, hus, wikiRoot, produtoTitulo, isCOR) {
   for (const uc of corUCs) {
     const slug = `${uc.ftId}-${toSlug(uc.titulo)}`;
     corUCOrder.push(slug);
-    files.push({ path: `${corBase}/Casos-de-Uso/${slug}.md`, content: mp(wikiUCFile(uc, hus.filter(h => h.ucId === uc.ucId), corEp || { id: "COR", titulo: "COR - Funcionalidades Transversais" }, "COR")) });
+    files.push({ path: `${corBase}/Casos-de-Uso/${slug}.md`, content: wikiUCFile(uc, hus.filter(h => h.ucId === uc.ucId), corEp || { id: "COR", titulo: "COR - Funcionalidades Transversais" }, "COR") });
   }
   files.push({ path: `${corBase}/Casos-de-Uso/.order`, content: corUCOrder.join("\n") });
 
@@ -2032,19 +2006,19 @@ function generateWikiFiles(epicos, ucs, hus, wikiRoot, produtoTitulo, isCOR) {
     const husEp  = hus.filter(h => h.epicId === ep.id);
     const base   = `${modRoot}/${modulo}`;
 
-    files.push({ path: `${base}/${modulo}.md`,                  content: mp(wikiModuleIndex(ep, ucsEp, modulo)) });
+    files.push({ path: `${base}/${modulo}.md`,                  content: wikiModuleIndex(ep, ucsEp, modulo) });
     files.push({ path: `${base}/Casos-de-Uso/Casos-de-Uso.md`,  content: wikiUCIndex(ep, ucsEp, modulo) });
-    files.push({ path: `${base}/Regras-de-Negocio.md`,           content: mp(wikiRNFile(ep, ucsEp, husEp, modulo)) });
-    files.push({ path: `${base}/Mensagens-de-Sistema.md`,        content: mp(wikiMsgFile(ep, ucsEp, modulo)) });
-    files.push({ path: `${base}/Requisitos-Funcionais.md`,       content: mp(wikiRFFile(ep, ucsEp, husEp, modulo)) });
-    files.push({ path: `${base}/Requisitos-Nao-Funcionais.md`,   content: mp(wikiRNFFile(ep, ucsEp, modulo)) });
+    files.push({ path: `${base}/Regras-de-Negocio.md`,           content: wikiRNFile(ep, ucsEp, husEp, modulo) });
+    files.push({ path: `${base}/Mensagens-de-Sistema.md`,        content: wikiMsgFile(ep, ucsEp, modulo) });
+    files.push({ path: `${base}/Requisitos-Funcionais.md`,       content: wikiRFFile(ep, ucsEp, husEp, modulo) });
+    files.push({ path: `${base}/Requisitos-Nao-Funcionais.md`,   content: wikiRNFFile(ep, ucsEp, modulo) });
     files.push({ path: `${base}/.order`, content: [modulo, "Casos-de-Uso", "Regras-de-Negocio", "Mensagens-de-Sistema", "Requisitos-Funcionais", "Requisitos-Nao-Funcionais"].join("\n") });
 
     const ucOrder = ["Casos-de-Uso"];
     for (const uc of ucsEp) {
       const slug = `${uc.ftId}-${toSlug(uc.titulo)}`;
       ucOrder.push(slug);
-      files.push({ path: `${base}/Casos-de-Uso/${slug}.md`, content: mp(wikiUCFile(uc, hus.filter(h => h.ucId === uc.ucId), ep, modulo)) });
+      files.push({ path: `${base}/Casos-de-Uso/${slug}.md`, content: wikiUCFile(uc, hus.filter(h => h.ucId === uc.ucId), ep, modulo) });
     }
     files.push({ path: `${base}/Casos-de-Uso/.order`, content: ucOrder.join("\n") });
   }
