@@ -269,16 +269,95 @@ Retorne SOMENTE JSON:
 }
 
 // ════════════════════════════════════════════════════════════════════
+// FASE 1.5 — Extrair Modelo de Domínio estruturado a partir de funcList
+// Consolida atores, entidades, regras de negócio e restrições NF.
+// ════════════════════════════════════════════════════════════════════
+
+async function fase1_5_extrairModeloDominio(funcList) {
+  const system = `Você é um analista de requisitos especialista em modelagem de domínio.
+Sua tarefa é consolidar uma lista de funcionalidades em um Modelo de Domínio estruturado.
+
+REGRAS:
+1. Consolide atores duplicados — mesmo ator com nomes levemente diferentes → um único ator canônico.
+2. Entidades de domínio = substantivos recorrentes que representam conceitos de negócio (não ações).
+3. Regras de negócio: inferidas da descrição de cada funcionalidade. Seja conservador — só inclua o que está explícito ou claramente implícito. Campo "origemFunc": ID da funcionalidade que originou a regra.
+4. Restrições não-funcionais: performance, segurança, compliance, disponibilidade mencionadas.
+5. Lacunas: informações ausentes que impediriam geração completa de requisitos.
+Retorne SOMENTE JSON sem markdown:
+{"atores":[{"id":"A01","nome":"string","tipo":"humano|sistema"}],"entidades":[{"id":"E01","nome":"string","atributos":["string"],"operacoes":["Inserir","Alterar","Excluir","Consultar"]}],"regrasNegocio":[{"id":"RN-DOM-001","descricao":"string","origemFunc":"F001"}],"restricoesNF":[{"categoria":"string","descricao":"string"}],"lacunas":["string"]}`;
+
+  try {
+    const raw = await claude(
+      `Funcionalidades extraídas do documento:\n${JSON.stringify(funcList, null, 2)}\n\nExtraia o Modelo de Domínio.`,
+      system, 4000, "claude-sonnet-4-6", 0
+    );
+    const parsed = safeJSON(raw) || recoverPartialJSON(raw);
+    if (!parsed) throw new Error("JSON inválido");
+    console.log(`[fase1_5] modelo: ${parsed.atores?.length || 0} atores, ${parsed.entidades?.length || 0} entidades, ${parsed.regrasNegocio?.length || 0} RNs`);
+    return parsed;
+  } catch (e) {
+    console.warn(`[fase1_5] falhou (${e.message}) — modelo vazio`);
+    return { atores: [], entidades: [], regrasNegocio: [], restricoesNF: [], lacunas: [] };
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// FASE 1c — Esqueleto: âncora MECE de Épicos + Features esperadas
+// Geração barata (uma frase por feature) antes do detalhe.
+// ════════════════════════════════════════════════════════════════════
+
+async function fase1c_gerarEsqueleto(epicos, domainModel) {
+  const system = `Você é um Product Manager experiente. Dado um conjunto de Épicos e um Modelo de Domínio, produza um ESQUELETO — mapa enxuto das Features/UCs esperadas em cada Épico.
+
+REGRAS INVIOLÁVEIS:
+1. Use EXATAMENTE os IDs e títulos dos Épicos fornecidos — não renomeie, não crie novos.
+2. Por épico: liste entre 3 e 7 features esperadas. Cada feature: id provisório sequencial, título (verbo infinitivo + objeto, máx 60 chars), resumo de uma frase (máx 20 palavras).
+3. Features dentro de um épico devem ser MECE (sem sobreposição, cobertura completa do domínio do épico).
+4. Padrão Manter: se há CRUD de uma entidade → inclua "Manter [Entidade]" como uma feature.
+5. Atores e entidades do Modelo de Domínio devem aparecer nas features correspondentes.
+Retorne SOMENTE JSON sem markdown:
+{"rationale":"string","epicos":[{"id":"EP001","titulo":"string","features":[{"id":"FT001","titulo":"string","resumo":"string"}]}]}`;
+
+  try {
+    const raw = await claude(
+      `Épicos:\n${JSON.stringify(epicos.map(e => ({ id: e.id, titulo: e.titulo, objetivo: e.objetivo, manterEntidades: e.manterEntidades })), null, 2)}\n\nModelo de Domínio (atores e entidades):\n${JSON.stringify({ atores: domainModel?.atores || [], entidades: domainModel?.entidades || [] }, null, 2)}\n\nGere o esqueleto de features.`,
+      system, 4000, "claude-sonnet-4-6", 0.2
+    );
+    const parsed = safeJSON(raw) || recoverPartialJSON(raw);
+    if (!parsed?.epicos?.length) throw new Error("JSON inválido ou épicos ausentes");
+    const total = parsed.epicos.reduce((acc, e) => acc + (e.features?.length || 0), 0);
+    console.log(`[fase1c] esqueleto: ${total} features previstas em ${parsed.epicos.length} épicos`);
+    return parsed;
+  } catch (e) {
+    console.warn(`[fase1c] falhou (${e.message}) — esqueleto fallback`);
+    return { rationale: "", epicos: epicos.map(e => ({ id: e.id, titulo: e.titulo, features: [] })) };
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
 // FASE 2 — Gerar N UCs para um Épico (com padrão Manter)
 // ════════════════════════════════════════════════════════════════════
 
-async function fase2_gerarUCsParaEpico(epico, funcList, ucStartIdx, correction = "") {
+async function fase2_gerarUCsParaEpico(epico, funcList, ucStartIdx, correction = "", domainModel = null, esqueleto = null) {
   let funcsDoEpico = funcList.filter(f => (epico.funcIds || []).includes(f.id));
   if (!funcsDoEpico.length && funcList.length) {
-    // IDs da IA não bateram com funcList (ex: "F1" vs "F001") — usa lista completa como fallback
     console.warn(`[fase2] ${epico.id}: funcIds ${JSON.stringify(epico.funcIds)} sem match em funcList (${funcList.length} items) — usando funcList completo`);
     funcsDoEpico = funcList;
   }
+
+  // Contexto acumulado: features esperadas do esqueleto para este épico
+  const featuresEsqueleto = esqueleto?.epicos?.find(e => e.id === epico.id)?.features || [];
+  const esqCtx = featuresEsqueleto.length
+    ? `\n\nFEATURES ESPERADAS (do esqueleto — gere EXATAMENTE estas, na mesma quantidade e escopo):\n${featuresEsqueleto.map(f => `- ${f.titulo}: ${f.resumo}`).join("\n")}`
+    : "";
+
+  // Contexto acumulado: atores e entidades do modelo de domínio
+  const atores = domainModel?.atores?.map(a => a.nome).join(", ") || "";
+  const entidades = domainModel?.entidades?.map(e => e.nome).join(", ") || "";
+  const domCtx = (atores || entidades)
+    ? `\n\nMODELO DE DOMÍNIO (use estes nomes canônicos):\n- Atores: ${atores || "não identificados"}\n- Entidades: ${entidades || "não identificadas"}`
+    : "";
+
   const system = `Você é um Analista de Requisitos UML 2.5.1. Gere TODOS os Casos de Uso do Épico.
 REGRAS OBRIGATÓRIAS:
 1. PADRÃO MANTER: CRUD da mesma entidade → UM UC "Manter [Entidade]". Fluxo principal = Consultar. Alternativos: FA1=Incluir, FA2=Alterar, FA3=Excluir. NÃO gere UCs separados para cada operação CRUD.
@@ -302,7 +381,7 @@ Retorne SOMENTE JSON (sem markdown):
   // if (_ragIndex?.length && _openaiKey) { ... }
 
   const raw = await claude(
-    `Épico: ${epico.id} — ${epico.titulo}\nObjetivo: ${epico.objetivo || ""}\nEntidades com padrão Manter: ${(epico.manterEntidades || []).join(", ") || "nenhuma"}\n\nFuncionalidades:\n${JSON.stringify(funcsDoEpico, null, 2)}\n\nGere todos os Casos de Uso.${corrNote}`,
+    `Épico: ${epico.id} — ${epico.titulo}\nObjetivo: ${epico.objetivo || ""}\nEntidades com padrão Manter: ${(epico.manterEntidades || []).join(", ") || "nenhuma"}${domCtx}${esqCtx}\n\nFuncionalidades:\n${JSON.stringify(funcsDoEpico, null, 2)}\n\nGere todos os Casos de Uso.${corrNote}`,
     system, 10000, "claude-opus-4-7", 0.3
   );
   const ucs = safeJSON(raw)?.ucs || recoverPartialJSON(raw)?.ucs || [];
@@ -348,8 +427,22 @@ function createFallbackHU(uc, idx) {
   };
 }
 
-async function fase3_gerarHUsParaUC(uc, huStartIdx, correction = "", rnPrefix = "RN") {
+async function fase3_gerarHUsParaUC(uc, huStartIdx, correction = "", rnPrefix = "RN", isCOR = false, domainModel = null, epicoParent = null) {
   const rn1 = `RN-${rnPrefix}-001`;
+
+  // Contexto acumulado: objetivo do épico-pai + regras de domínio aplicáveis
+  const epicCtx = epicoParent
+    ? `\n\nÉPICO-PAI (contexto de negócio):\nID: ${epicoParent.id}\nTítulo: ${epicoParent.titulo}\nObjetivo: ${epicoParent.objetivo || ""}`
+    : "";
+
+  const rnsDominio = (domainModel?.regrasNegocio || []).filter(rn => {
+    // Filtra RNs relevantes: originadas de funcionalidades que pertencem ao épico deste UC
+    const funcIdsEpico = epicoParent?.funcIds || [];
+    return !funcIdsEpico.length || funcIdsEpico.includes(rn.origemFunc);
+  }).slice(0, 8); // limita para não estourar contexto
+  const rnCtx = rnsDominio.length
+    ? `\n\nREGRAS DE NEGÓCIO DO DOMÍNIO (considere ao gerar critérios de aceitação):\n${rnsDominio.map(r => `- ${r.id}: ${r.descricao}`).join("\n")}`
+    : "";
   const system = `Você é um Analista de Requisitos ágil. Gere TODAS as Histórias de Usuário para este Caso de Uso.
 REGRAS OBRIGATÓRIAS:
 1. QUANTIDADE DE HUs POR UC — REGRA INVEST:
@@ -387,7 +480,7 @@ Retorne SOMENTE JSON sem markdown:
   // if (_ragIndex?.length && _openaiKey) { ... }
 
   const raw = await claude(
-    `Caso de Uso:\n${JSON.stringify(ucCompact, null, 2)}\n\nGere as HUs. Primeira começa em REQ${pad3(huStartIdx + 1)}.${corrNote}`,
+    `Caso de Uso:\n${JSON.stringify(ucCompact, null, 2)}${epicCtx}${rnCtx}\n\nGere as HUs. Primeira começa em REQ${pad3(huStartIdx + 1)}.${corrNote}`,
     system, 8192, "claude-opus-4-7", 0.3
   );
   const hus = safeJSON(raw)?.hus || recoverPartialJSON(raw)?.hus || [];
@@ -1967,6 +2060,8 @@ export default function AgenteRequisitos() {
   const [file, setFile]           = useState(null);
   const [chunks, setChunks]     = useState(_s.chunks ?? []);
   const [funcList, setFuncList] = useState(_s.funcList ?? []);
+  const [domainModel, setDomainModel] = useState(_s.domainModel ?? null);
+  const [esqueleto, setEsqueleto]     = useState(_s.esqueleto ?? null);
   const [epicos, setEpicos]     = useState(_s.epicos ?? []);
   const [ucs, setUcs]           = useState(_s.ucs ?? []);
   const [hus, setHus]           = useState(_s.hus ?? []);
@@ -1997,7 +2092,7 @@ export default function AgenteRequisitos() {
   // ── Persiste estado no localStorage (camadas para evitar quota exceeded) ──
   useEffect(() => {
     const base = {
-      phase, maxPhase, funcList, epicos, ucs, hus, cts, chunks,
+      phase, maxPhase, funcList, domainModel, esqueleto, epicos, ucs, hus, cts, chunks,
       produtoTitulo, isCOR,
       fileName: file?.name ?? savedFileName,
       savedAt: new Date().toISOString(),
@@ -2015,7 +2110,7 @@ export default function AgenteRequisitos() {
         trySet(minimal);
       }
     }
-  }, [phase, maxPhase, funcList, epicos, ucs, hus, cts, chunks]);
+  }, [phase, maxPhase, funcList, domainModel, esqueleto, epicos, ucs, hus, cts, chunks]);
   const [azOrg, setAzOrg]         = useState("Rafaelcotrin");
   const [azProject, setAzProject] = useState("Projeto DDA");
   const [azAreaPath, setAzAreaPath] = useState("Projeto DDA");
@@ -2155,10 +2250,16 @@ export default function AgenteRequisitos() {
       }
       if (!allFuncs.length) throw new Error("Nenhuma funcionalidade identificada.");
       setFuncList(allFuncs);
+      log(`◈ Extraindo Modelo de Domínio (atores, entidades, regras)...`);
+      const domModel = await fase1_5_extrairModeloDominio(allFuncs);
+      setDomainModel(domModel);
       log(`◈ Agrupando ${allFuncs.length} funcionalidades em Épicos...`);
       const eps = await fase1b_gerarEpicos(allFuncs);
       if (!eps.length) throw new Error("Não foi possível gerar Épicos.");
       setEpicos(eps);
+      log(`◈ Gerando Esqueleto de Features (âncora MECE)...`);
+      const esq = await fase1c_gerarEsqueleto(eps, domModel);
+      setEsqueleto(esq);
       goToPhase(2);
     } catch (e) { setErr(e.message, e); }
     finally { setLoading(false); setLoadMsg(""); setProgress({ cur: 0, total: 0 }); }
@@ -2173,7 +2274,7 @@ export default function AgenteRequisitos() {
       for (let i = 0; i < epicos.length; i++) {
         log(`◻ Gerando Features para ${epicos[i].id}...`, i, epicos.length);
         try {
-          const ucsEp = await fase2_gerarUCsParaEpico(epicos[i], funcList, result.length);
+          const ucsEp = await fase2_gerarUCsParaEpico(epicos[i], funcList, result.length, "", domainModel, esqueleto);
           result.push(...ucsEp);
           if (!ucsEp.length) erros.push(`${epicos[i].id}: 0 UCs gerados`);
         } catch (eEpico) {
@@ -2200,11 +2301,12 @@ export default function AgenteRequisitos() {
         const uc = ucs[i];
         log(`◈ Gerando Requisitos para ${uc.ftId}...`, i, ucs.length);
         const rnPfx = ucToRNPrefix(uc.titulo);
-        let husUC = await fase3_gerarHUsParaUC(uc, result.length, "", rnPfx, isCOR);
+        const epicoPai = epicos.find(e => e.id === uc.epicId) || null;
+        let husUC = await fase3_gerarHUsParaUC(uc, result.length, "", rnPfx, isCOR, domainModel, epicoPai);
 
         if (!husUC.length) {
           log(`↺ Retentando ${uc.ftId} (sem HUs na 1ª tentativa)...`, i, ucs.length);
-          husUC = await fase3_gerarHUsParaUC(uc, result.length, "", rnPfx, isCOR);
+          husUC = await fase3_gerarHUsParaUC(uc, result.length, "", rnPfx, isCOR, domainModel, epicoPai);
         }
 
         if (!husUC.length) {
@@ -2256,6 +2358,8 @@ export default function AgenteRequisitos() {
       const eps = await fase1b_gerarEpicos(funcList, corrEpicos);
       if (!eps.length) throw new Error("Não foi possível gerar Épicos.");
       setEpicos(eps);
+      log("◈ Atualizando Esqueleto de Features...");
+      setEsqueleto(await fase1c_gerarEsqueleto(eps, domainModel));
       setCorrEpicos("");
     } catch (e) { setErr(e.message, e); }
     finally { setLoading(false); setLoadMsg(""); }
@@ -2268,7 +2372,7 @@ export default function AgenteRequisitos() {
     try {
       for (let i = 0; i < epicos.length; i++) {
         log(`◻ Regerando Features para ${epicos[i].id}...`, i, epicos.length);
-        const ucsEp = await fase2_gerarUCsParaEpico(epicos[i], funcList, result.length, corrUCs);
+        const ucsEp = await fase2_gerarUCsParaEpico(epicos[i], funcList, result.length, corrUCs, domainModel, esqueleto);
         result.push(...ucsEp);
       }
       if (!result.length) throw new Error("Nenhuma Feature (UC) gerada.");
@@ -2287,7 +2391,8 @@ export default function AgenteRequisitos() {
       for (let i = 0; i < ucs.length; i++) {
         const uc = ucs[i];
         log(`◈ Regerando Requisitos para ${uc.ftId}...`, i, ucs.length);
-        let husUC = await fase3_gerarHUsParaUC(uc, result.length, corrHUs, ucToRNPrefix(uc.titulo), isCOR);
+        const epicoPaiCorr = epicos.find(e => e.id === uc.epicId) || null;
+        let husUC = await fase3_gerarHUsParaUC(uc, result.length, corrHUs, ucToRNPrefix(uc.titulo), isCOR, domainModel, epicoPaiCorr);
         if (!husUC.length) {
           ucsSemHU.push(`${uc.ftId}`);
           husUC = [createFallbackHU(uc, result.length)];
