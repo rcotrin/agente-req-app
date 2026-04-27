@@ -898,7 +898,7 @@ function wikiYaml(titulo, modulo, tipo) {
 }
 
 function wikiHistorico() {
-  return `\n---\n\n## Historico de Alteracoes\n\n<!-- HISTORICO:START -->\n| Versao | Data | Autor | Commit | Mensagem | Aprovado Por |\n|--------|------|-------|--------|----------|--------------|\n| - | - | - | - | _Aguardando primeiro commit_ | - |\n<!-- HISTORICO:END -->\n`;
+  return `\n---\n\n## Historico de Alteracoes\n\n<!-- HISTORICO:START -->\n| Versao | Data | Autor | Commit | Descricao | Status |\n|--------|------|-------|--------|-----------|--------|\n| - | - | - | - | _Aguardando primeiro commit_ | - |\n<!-- HISTORICO:END -->\n`;
 }
 
 // ── Índice do módulo ─────────────────────────────────────────────
@@ -1873,10 +1873,12 @@ function inferRNNome(descricao) {
   return words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ") || "Regra de Negocio";
 }
 
-// Mescla versão e histórico do arquivo existente no novo conteúdo gerado
-// oldContent = conteúdo atual do repo; newContent = conteúdo recém gerado pelo agente
-function mergeDocVersion(newContent, oldContent) {
+// Mescla versão e histórico do arquivo existente no novo conteúdo gerado.
+// oldContent = conteúdo atual do repo; newContent = conteúdo recém gerado pelo agente.
+// runId = identificador da sessão de geração (incluído no commit do Azure e nos docs).
+function mergeDocVersion(newContent, oldContent, runId = "") {
   const today = new Date().toISOString().split("T")[0];
+  const commitRef = runId || "-";
 
   // Extrai versão atual do arquivo existente
   const vMatch = oldContent.match(/doc_version:\s*"(\d+)\.(\d+)\.(\d+)"/);
@@ -1884,17 +1886,21 @@ function mergeDocVersion(newContent, oldContent) {
   const oldVersion = `${ma}.${mi}.${pa}`;
   const newVersion = `${ma}.${mi}.${parseInt(pa, 10) + 1}`;
 
-  // Extrai linhas de histórico já existentes (sem placeholder)
+  // Extrai linhas de histórico já existentes, removendo placeholders de ambos os formatos
   const histMatch = oldContent.match(/<!-- HISTORICO:START -->\n\| Versao[^\n]*\n\|[-| ]+\n([\s\S]*?)<!-- HISTORICO:END -->/);
-  const oldRows = (histMatch?.[1] || "").replace(/\| - \| - \| - \| - \| _Aguardando primeiro commit_ \|\n?/g, "");
+  const oldRows = (histMatch?.[1] || "")
+    .replace(/\| - \| - \| - \| - \| _Aguardando primeiro commit_ \| - \|\n?/g, "")
+    .replace(/\| - \| - \| - \| - \| _Aguardando primeiro commit_ \|\n?/g, "");
 
-  // Nova linha para a versão que está sendo substituída
-  const newRow = `| ${oldVersion} | ${today} | Agente de Requisitos | - | Versao anterior — substituida por ${newVersion} |\n`;
+  // Linha que arquiva a versão anterior como obsoleta
+  const newRow = `| ${oldVersion} | ${today} | Agente de Requisitos | ${commitRef} | Substituido por v${newVersion} | obsoleto |\n`;
 
-  // Aplica nova versão e last_modified no conteúdo gerado
+  // Atualiza campos YAML: versão, datas, autor e rastreabilidade
   let updated = newContent
     .replace(/doc_version:\s*"[^"]*"/, `doc_version: "${newVersion}"`)
-    .replace(/last_modified:\s*"[^"]*"/, `last_modified: "${today}"`);
+    .replace(/last_modified:\s*"[^"]*"/, `last_modified: "${today}"`)
+    .replace(/last_author:\s*"[^"]*"/, `last_author: "Agente de Requisitos"`)
+    .replace(/last_commit:\s*"[^"]*"/, `last_commit: "${commitRef}"`);
 
   // Injeta histórico acumulado dentro das tags
   updated = updated.replace(
@@ -1905,7 +1911,28 @@ function mergeDocVersion(newContent, oldContent) {
   return updated;
 }
 
-async function pushToWiki(org, project, pat, repoName, branch, files, commitMsg) {
+// Preenche metadados YAML e histórico inicial de um arquivo novo (sem versão anterior).
+function injectNewFileMetadata(content, runId = "") {
+  const today = new Date().toISOString().split("T")[0];
+  const commitRef = runId || "-";
+
+  let updated = content
+    .replace(/criado_em:\s*"[^"]*"/, `criado_em: "${today}"`)
+    .replace(/last_modified:\s*"[^"]*"/, `last_modified: "${today}"`)
+    .replace(/last_author:\s*"[^"]*"/, `last_author: "Agente de Requisitos"`)
+    .replace(/last_commit:\s*"[^"]*"/, `last_commit: "${commitRef}"`);
+
+  // Substitui placeholder do histórico pelo registro real de criação
+  updated = updated.replace(
+    /(<!-- HISTORICO:START -->\n\| Versao[^\n]*\n\|[-| ]+\n)([\s\S]*?)(<!-- HISTORICO:END -->)/,
+    (_, header, _placeholder, end) =>
+      `${header}| 1.0.0 | ${today} | Agente de Requisitos | ${commitRef} | Versao inicial gerada pelo Agente | proposto |\n${end}`
+  );
+
+  return updated;
+}
+
+async function pushToWiki(org, project, pat, repoName, branch, files, commitMsg, runId = "") {
   const token   = btoa(`:${pat}`);
   const headers = { "Content-Type": "application/json", Authorization: `Basic ${token}` };
   const base    = `/devops/${encodeURIComponent(org)}/${encodeURIComponent(project)}/_apis/git/repositories`;
@@ -1992,14 +2019,15 @@ async function pushToWiki(org, project, pat, repoName, branch, files, commitMsg)
     if (exists) {
       updatedCount++;
       if (f.path.endsWith(".md")) {
-        // Se temos o conteúdo antigo, faz merge completo de versão + histórico
         content = oldContents[f.path]
-          ? mergeDocVersion(f.content, oldContents[f.path])
+          ? mergeDocVersion(f.content, oldContents[f.path], runId)
           : f.content.replace(/doc_version:\s*"(\d+)\.(\d+)\.(\d+)"/, (_, ma, mi, pa) => `doc_version: "${ma}.${mi}.${parseInt(pa)+1}"`);
       }
       return { changeType: "edit", item: { path: f.path }, newContent: { content: utf8ToB64(content), contentType: "base64encoded" } };
     } else {
       newCount++;
+      // Novos arquivos .md recebem metadados de criação e histórico inicial
+      if (f.path.endsWith(".md")) content = injectNewFileMetadata(f.content, runId);
       return { changeType: "add",  item: { path: f.path }, newContent: { content: utf8ToB64(content), contentType: "base64encoded" } };
     }
   });
@@ -2798,13 +2826,15 @@ export default function AgenteRequisitos() {
     if (!azOrg || !azWikiRepo || !azPat) { setError("Preencha Organização, Repositório Wiki e PAT."); return; }
     setError(""); setLoading(true); setWikiLog([]);
     try {
+      const runId = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 15); // ex: "20260426143022"
       log("📄 Gerando arquivos markdown...");
       const files = generateWikiFiles(epicos, ucs, hus, azWikiRoot, produtoTitulo, isCOR);
       log(`📤 Enviando ${files.length} arquivo(s) para ${azWikiRepo}/${azWikiBranch}...`);
       const result = await pushToWiki(
         azOrg, azProject, azPat,
         azWikiRepo, azWikiBranch, files,
-        `docs: artefatos gerados pelo Agente de Requisitos — ${epicos.length} EP · ${ucs.length} UC · ${hus.length} REQ`
+        `docs: artefatos gerados pelo Agente de Requisitos — ${epicos.length} EP · ${ucs.length} UC · ${hus.length} REQ [run:${runId}]`,
+        runId
       );
       const stats = result._stats || {};
       const pushed = files.length;
