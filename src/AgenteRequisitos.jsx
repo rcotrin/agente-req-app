@@ -2460,6 +2460,7 @@ export default function AgenteRequisitos() {
   const [azOrg, setAzOrg]         = useState("Rafaelcotrin");
   const [azProject, setAzProject] = useState("Projeto DDA");
   const [azAreaPath, setAzAreaPath] = useState("Projeto DDA");
+  const [azHuType, setAzHuType]   = useState("Requirement");
   const [azPat, setAzPat]         = useState("");
   const [showPat, setShowPat]     = useState(false);
   const [configOpen, setConfigOpen] = useState(false); // começa fechado se org já preenchida
@@ -3124,7 +3125,7 @@ export default function AgenteRequisitos() {
       if (!hu.workItem) continue;
       log(`🚀 Criando Requirement ${i + 1}/${selectedHus.length}...`);
       try {
-        const res = await createAzureWorkItem(azOrg, azProject, azPat, "Requirement",
+        const res = await createAzureWorkItem(azOrg, azProject, azPat, azHuType,
           hu.titulo,
           huToHtml(hu),
           huCriteriosToHtml(hu),
@@ -4171,6 +4172,15 @@ export default function AgenteRequisitos() {
                       <label style={{ display: "block", fontSize: 11, color: C.textDim, marginBottom: 6 }}>Area Path</label>
                       <input value={azAreaPath} onChange={e => setAzAreaPath(e.target.value)} placeholder="Projeto DDA" />
                     </div>
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ display: "block", fontSize: 11, color: C.textDim, marginBottom: 6 }}>Tipo de Work Item — HU</label>
+                    <select value={azHuType} onChange={e => setAzHuType(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "'Manrope',sans-serif", fontSize: 12 }}>
+                      <option value="Requirement">Requirement</option>
+                      <option value="Product Backlog Item">Product Backlog Item</option>
+                      <option value="User Story">User Story</option>
+                      <option value="Issue">Issue</option>
+                    </select>
                   </div>
                   <div style={{ marginBottom: 16 }}>
                     <label style={{ display: "block", fontSize: 11, color: C.textDim, marginBottom: 6 }}>Personal Access Token (PAT)</label>
