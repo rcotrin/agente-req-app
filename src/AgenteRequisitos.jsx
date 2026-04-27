@@ -2012,7 +2012,9 @@ async function pushToWiki(org, project, pat, repoName, branch, files, commitMsg,
   }));
 
   // 5. Montar changes: "add" para novos, "edit" para existentes (nunca "delete")
+  // mdProcessed guarda o conteúdo já processado de cada .md (string) para o fixup do commitId.
   let newCount = 0, updatedCount = 0;
+  const mdProcessed = new Map(); // path → conteúdo final com runId
   const changes = files.map(f => {
     const exists = existingPaths.has(f.path);
     let content = f.content;
@@ -2022,17 +2024,20 @@ async function pushToWiki(org, project, pat, repoName, branch, files, commitMsg,
         content = oldContents[f.path]
           ? mergeDocVersion(f.content, oldContents[f.path], runId)
           : f.content.replace(/doc_version:\s*"(\d+)\.(\d+)\.(\d+)"/, (_, ma, mi, pa) => `doc_version: "${ma}.${mi}.${parseInt(pa)+1}"`);
+        mdProcessed.set(f.path, content);
       }
       return { changeType: "edit", item: { path: f.path }, newContent: { content: utf8ToB64(content), contentType: "base64encoded" } };
     } else {
       newCount++;
-      // Novos arquivos .md recebem metadados de criação e histórico inicial
-      if (f.path.endsWith(".md")) content = injectNewFileMetadata(f.content, runId);
-      return { changeType: "add",  item: { path: f.path }, newContent: { content: utf8ToB64(content), contentType: "base64encoded" } };
+      if (f.path.endsWith(".md")) {
+        content = injectNewFileMetadata(f.content, runId);
+        mdProcessed.set(f.path, content);
+      }
+      return { changeType: "add", item: { path: f.path }, newContent: { content: utf8ToB64(content), contentType: "base64encoded" } };
     }
   });
 
-  // 5. Push único com todos os changes
+  // 6. Push principal
   const r = await fetch(`${base}/${repo.id}/pushes?api-version=7.1`, {
     method: "POST", headers,
     body: JSON.stringify({ refUpdates: [{ name: `refs/heads/${branch}`, oldObjectId }], commits: [{ comment: commitMsg, changes }] }),
@@ -2042,7 +2047,30 @@ async function pushToWiki(org, project, pat, repoName, branch, files, commitMsg,
     throw new Error(`Push falhou (HTTP ${r.status}): ${t.slice(0, 220)}`);
   }
   const result = await r.json();
-  return { ...result, _stats: { newCount, updatedCount, repoCreated: created } };
+  const realCommitId = result.commits?.[0]?.commitId || "";
+
+  // 7. Segundo push cirúrgico: substitui o runId pelo commitId real do Azure em todos os .md
+  if (realCommitId && runId && mdProcessed.size > 0) {
+    try {
+      const fixupChanges = [];
+      for (const [path, processed] of mdProcessed) {
+        const fixed = processed
+          .replace(new RegExp(runId, "g"), realCommitId);
+        fixupChanges.push({ changeType: "edit", item: { path }, newContent: { content: utf8ToB64(fixed), contentType: "base64encoded" } });
+      }
+      await fetch(`${base}/${repo.id}/pushes?api-version=7.1`, {
+        method: "POST", headers,
+        body: JSON.stringify({
+          refUpdates: [{ name: `refs/heads/${branch}`, oldObjectId: realCommitId }],
+          commits: [{ comment: `docs: injeta commitId ${realCommitId.slice(0, 8)} nos metadados wiki`, changes: fixupChanges }],
+        }),
+      });
+    } catch (e) {
+      console.warn("[wiki] fixup de commitId falhou (não crítico):", e.message);
+    }
+  }
+
+  return { ...result, _stats: { newCount, updatedCount, repoCreated: created }, _commitId: realCommitId };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -2838,10 +2866,12 @@ export default function AgenteRequisitos() {
       );
       const stats = result._stats || {};
       const pushed = files.length;
+      const commitId = result._commitId || result.commits?.[0]?.commitId || "";
       const msgParts = [];
       if (stats.repoCreated)  msgParts.push(`repositório "${azWikiRepo}" criado`);
       if (stats.newCount)     msgParts.push(`${stats.newCount} arquivo(s) criado(s)`);
       if (stats.updatedCount) msgParts.push(`${stats.updatedCount} versionado(s)`);
+      if (commitId)           msgParts.push(`commit ${commitId.slice(0, 8)}`);
       const msg = msgParts.length ? msgParts.join(" · ") : `${pushed} arquivo(s) enviados`;
       setWikiLog([{ ok: true, msg, url: result?.commits?.[0]?.url || result?.url }]);
     } catch (e) {
