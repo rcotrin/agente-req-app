@@ -1623,14 +1623,17 @@ function wikiMsgFile(ep, ucsEp, modulo) {
   }
   let md = wikiYaml(`Mensagens de Sistema - ${titulo}`, modulo, "mensagens-de-sistema");
   md += `# Mensagens de Sistema - ${titulo}\n\n`;
-  md += `## Tabela de Mensagens\n\n| ID | Tipo | Ponto de Origem | Mensagem | Acao Esperada |\n|----|------|-----------------|----------|---------------|\n`;
-  msgs.forEach(m => { md += `| <a id="${m.id.toLowerCase()}"></a>${m.id} | ${m.tipo} | ${m.contexto} | ${m.mensagem} | ${m.acao} |\n`; });
-  md += `\n## Legenda\n\n| Tipo | Uso |\n|------|-----|\n`;
-  md += `| Sucesso | Operacao concluida com exito |\n`;
-  md += `| Alerta | Situacao que requer atencao |\n`;
-  md += `| Erro | Falha - requer acao |\n`;
-  md += `| Informacao | Mensagem neutra |\n`;
-  md += `| Seguranca | Acesso negado / sessao expirada |\n`;
+  md += `## Indice\n\n| ID | Tipo | Mensagem |\n|----|------|----------|\n`;
+  msgs.forEach(m => { md += `| [${m.id}](#${m.id.toLowerCase()}) | ${m.tipo} | ${m.mensagem} |\n`; });
+  md += `\n---\n\n## Detalhamento\n\n`;
+  msgs.forEach(m => {
+    md += `### ${m.id}\n\n`;
+    md += `| Campo | Valor |\n|-------|-------|\n`;
+    md += `| **Tipo** | ${m.tipo} |\n`;
+    md += `| **Ponto de Origem** | ${m.contexto} |\n`;
+    md += `| **Mensagem** | ${m.mensagem} |\n`;
+    md += `| **Acao Esperada** | ${m.acao} |\n\n`;
+  });
   return md + wikiHistorico();
 }
 
@@ -1808,11 +1811,17 @@ function wikiCORMSGGlobal(allUCs) {
   }
   let md = wikiYaml("Mensagens de Sistema - COR", "COR", "mensagens-de-sistema");
   md += `# Mensagens de Sistema - COR\n\n`;
-  md += `## Tabela de Mensagens\n\n| ID | Tipo | Ponto de Origem | Mensagem | Acao Esperada |\n|----|------|-----------------|----------|---------------|\n`;
-  msgs.forEach(m => { md += `| <a id="${m.id.toLowerCase()}"></a>${m.id} | ${m.tipo} | ${m.contexto} | ${m.mensagem} | ${m.acao} |\n`; });
-  md += `\n## Legenda\n\n| Tipo | Uso |\n|------|-----|\n`;
-  md += `| Sucesso | Operacao concluida com exito |\n| Alerta | Situacao que requer atencao |\n`;
-  md += `| Erro | Falha - requer acao |\n| Informacao | Mensagem neutra |\n| Seguranca | Acesso negado / sessao expirada |\n`;
+  md += `## Indice\n\n| ID | Tipo | Mensagem |\n|----|------|----------|\n`;
+  msgs.forEach(m => { md += `| [${m.id}](#${m.id.toLowerCase()}) | ${m.tipo} | ${m.mensagem} |\n`; });
+  md += `\n---\n\n## Detalhamento\n\n`;
+  msgs.forEach(m => {
+    md += `### ${m.id}\n\n`;
+    md += `| Campo | Valor |\n|-------|-------|\n`;
+    md += `| **Tipo** | ${m.tipo} |\n`;
+    md += `| **Ponto de Origem** | ${m.contexto} |\n`;
+    md += `| **Mensagem** | ${m.mensagem} |\n`;
+    md += `| **Acao Esperada** | ${m.acao} |\n\n`;
+  });
   return md + wikiHistorico();
 }
 
